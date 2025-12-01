@@ -28,48 +28,67 @@ export async function getYouTubeContent(
   plugin?: FileOrganizer
 ): Promise<{ title: string; transcript: string }> {
   // Use backend API if plugin is available
-  if (plugin) {
-    try {
-      const serverUrl = plugin.getServerUrl();
-      const apiKey = plugin.getApiKey();
-
-      if (serverUrl && apiKey) {
-        console.log("[YouTube Service] Fetching via backend API:", videoId);
-        const response = await fetch(`${serverUrl}/api/youtube-transcript`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({ videoId }),
-        });
-
-        if (response.ok) {
-          const data = await response.json();
-          console.log("[YouTube Service] Successfully fetched via backend API");
-          return { title: data.title, transcript: data.transcript };
-        } else {
-          const errorData = await response.json().catch(() => ({}));
-          console.warn(
-            "[YouTube Service] Backend API failed:",
-            response.status,
-            errorData.error
-          );
-          throw new YouTubeError(
-            errorData.error ||
-              `Backend API failed with status ${response.status}`
-          );
-        }
-      }
-    } catch (error) {
-      console.error("[YouTube Service] Backend API error:", error);
-      const message = error instanceof Error ? error.message : "Unknown error";
-      logger.error("Error fetching YouTube content from backend:", error);
-      throw new YouTubeError(message);
-    }
+  if (!plugin) {
+    throw new YouTubeError(
+      "Plugin instance required to fetch YouTube content. Please ensure the plugin is properly initialized."
+    );
   }
 
-  throw new YouTubeError("Plugin instance required to fetch YouTube content");
+  try {
+    const serverUrl = plugin.getServerUrl();
+    const apiKey = plugin.getApiKey();
+
+    if (!serverUrl) {
+      throw new YouTubeError(
+        "Server URL not configured. Please set your server URL in plugin settings."
+      );
+    }
+
+    if (!apiKey) {
+      throw new YouTubeError(
+        "API key not configured. Please set your API key in plugin settings."
+      );
+    }
+
+    console.log("[YouTube Service] Fetching via backend API:", videoId);
+    console.log("[YouTube Service] Server URL:", serverUrl);
+
+    const response = await fetch(`${serverUrl}/api/youtube-transcript`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({ videoId }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log("[YouTube Service] Successfully fetched via backend API");
+      return { title: data.title, transcript: data.transcript };
+    } else {
+      const errorData = await response.json().catch(() => ({}));
+      console.error(
+        "[YouTube Service] Backend API failed:",
+        response.status,
+        errorData.error
+      );
+      throw new YouTubeError(
+        errorData.error ||
+          `Backend API failed with status ${response.status}. Please check your server configuration.`
+      );
+    }
+  } catch (error) {
+    if (error instanceof YouTubeError) {
+      throw error; // Re-throw YouTubeError as-is
+    }
+    console.error("[YouTube Service] Backend API error:", error);
+    const message = error instanceof Error ? error.message : "Unknown error";
+    logger.error("Error fetching YouTube content from backend:", error);
+    throw new YouTubeError(
+      `Failed to fetch YouTube content: ${message}. Please check your server URL and API key configuration.`
+    );
+  }
 }
 
 export function getOriginalContent(content: string): string {
