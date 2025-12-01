@@ -21,7 +21,17 @@ async function getYoutubeInstance(): Promise<Innertube> {
  * Fetches YouTube video transcript and title using YouTube.js
  * POST /api/youtube-transcript
  * Body: { videoId: string }
+ * 
+ * GET /api/youtube-transcript - Health check endpoint
  */
+export async function GET(request: NextRequest) {
+  return NextResponse.json({
+    message: 'YouTube Transcript API is available',
+    method: 'Use POST with { videoId: string } in the request body',
+    endpoint: '/api/youtube-transcript',
+  });
+}
+
 export async function POST(request: NextRequest) {
   try {
     // Authenticate the user
