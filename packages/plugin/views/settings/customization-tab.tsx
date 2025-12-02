@@ -18,9 +18,11 @@ export const CustomizationTab: React.FC<CustomizationTabProps> = ({ plugin }) =>
 
   // force set user embeddings to false
   useEffect(() => {
-    plugin.settings.useFolderEmbeddings = false;
-    plugin.saveSettings();
-  }, [plugin.settings]);
+    if (plugin.settings.useFolderEmbeddings !== false) {
+      plugin.settings.useFolderEmbeddings = false;
+      plugin.saveSettings();
+    }
+  }, []); // Empty array = run only once on mount
 
   const handleToggleChange = async (value: boolean, setter: React.Dispatch<React.SetStateAction<boolean>>, settingKey: keyof typeof plugin.settings) => {
     setter(value);
@@ -41,7 +43,7 @@ export const CustomizationTab: React.FC<CustomizationTabProps> = ({ plugin }) =>
         <h3 className="text-lg font-semibold mb-4 text-[--text-normal]">Inbox Processing</h3>
         <div className="bg-[--background-secondary] p-4 rounded-lg mb-4">
           <div className="text-sm text-[--text-muted]">
-            These settings control how new files are automatically handled when they enter your vault through the inbox. 
+            These settings control how new files are automatically handled when they enter your vault through the inbox.
             Enable or disable automatic processing features and configure how the AI should handle your incoming documents.
           </div>
         </div>
@@ -61,8 +63,8 @@ export const CustomizationTab: React.FC<CustomizationTabProps> = ({ plugin }) =>
           <div className="bg-[--background-secondary] p-4 rounded-lg mt-2">
             <div className="font-medium text-[--text-normal] mb-2">Document Type Templates</div>
             <div className="text-sm text-[--text-muted]">
-              To enable auto-formatting, create template files in the File Organizer template folder. 
-              Name each file according to its document type (e.g., 'workout.md', 'meeting-notes.md'). 
+              To enable auto-formatting, create template files in the File Organizer template folder.
+              Name each file according to its document type (e.g., 'workout.md', 'meeting-notes.md').
               The content of each file should contain the formatting instructions.
               You can manage these templates through the AI sidebar.
             </div>
@@ -81,12 +83,12 @@ export const CustomizationTab: React.FC<CustomizationTabProps> = ({ plugin }) =>
         <h3 className="text-lg font-semibold mb-4 text-[--text-normal]">General Settings</h3>
         <div className="bg-[--background-secondary] p-4 rounded-lg mb-4">
           <div className="text-sm text-[--text-muted]">
-            Configure how File Organizer behaves across your vault. These settings affect both manual operations 
-            and provide the base configuration for inbox processing. Customize naming conventions, tagging behavior, 
+            Configure how File Organizer behaves across your vault. These settings affect both manual operations
+            and provide the base configuration for inbox processing. Customize naming conventions, tagging behavior,
             and folder organization to match your workflow.
           </div>
         </div>
-        
+
         {/* File Naming subsection */}
         <div className="mb-6">
           <h4 className="font-medium text-[--text-normal] mb-2">File Naming</h4>
@@ -150,7 +152,7 @@ export const CustomizationTab: React.FC<CustomizationTabProps> = ({ plugin }) =>
             />
             <div className="bg-[--background-secondary] p-4 rounded-lg">
               <div className="text-sm text-[--text-muted]">
-                These instructions will be used to generate descriptions for images in your documents. 
+                These instructions will be used to generate descriptions for images in your documents.
                 The AI will analyze the image content and create descriptions based on your specifications.
               </div>
             </div>
