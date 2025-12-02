@@ -126,20 +126,42 @@ export async function POST(request: NextRequest) {
         videoInfoType: typeof videoInfo,
       });
 
-      // Get video title
-      const title = videoInfo.basic_info?.title || 'Untitled YouTube Video';
+      // Get video title - try multiple sources
+      let title = 'Untitled YouTube Video';
+      if (videoInfo.basic_info?.title) {
+        title = videoInfo.basic_info.title;
+      } else if ((videoInfo as any).primary_info?.title) {
+        title = (videoInfo as any).primary_info.title;
+      } else if ((videoInfo as any).secondary_info?.title) {
+        title = (videoInfo as any).secondary_info.title;
+      }
       console.log(`[YouTube API] Video title: ${title}`);
-      if (!videoInfo.basic_info?.title) {
-        console.warn('[YouTube API] Warning: basic_info.title is missing!');
+
+      if (title === 'Untitled YouTube Video') {
+        console.warn(
+          '[YouTube API] Warning: Could not find title in any source!'
+        );
         console.log(
-          '[YouTube API] basic_info content:',
-          JSON.stringify(videoInfo.basic_info, null, 2)
+          '[YouTube API] primary_info:',
+          (videoInfo as any).primary_info
+        );
+        console.log(
+          '[YouTube API] secondary_info:',
+          (videoInfo as any).secondary_info
         );
       }
 
-      // Check caption availability
+      // Check caption availability - inspect more carefully
       console.log('[YouTube API] Checking caption availability...');
       const captions = videoInfo.captions;
+
+      console.log('[YouTube API] Captions inspection:', {
+        captionsType: typeof captions,
+        captionsValue: captions,
+        isNull: captions === null,
+        isUndefined: captions === undefined,
+        captionsKeys: captions ? Object.keys(captions) : [],
+      });
 
       if (!captions) {
         console.log(
@@ -148,10 +170,29 @@ export async function POST(request: NextRequest) {
             keys: Object.keys(videoInfo),
             hasStreamingData: !!videoInfo.streaming_data,
             hasPlayabilityStatus: !!videoInfo.playability_status,
+            playabilityStatus: (videoInfo as any).playability_status,
           }
         );
+
+        // Check if this is a bot detection issue
+        const playabilityStatus = (videoInfo as any).playability_status;
+        if (
+          playabilityStatus?.status === 'ERROR' ||
+          playabilityStatus?.reason
+        ) {
+          console.error(
+            '[YouTube API] Playability error detected:',
+            playabilityStatus
+          );
+          throw new Error(
+            `YouTube returned an error: ${
+              playabilityStatus.reason || 'Unknown error'
+            } - This may be due to bot detection or regional restrictions.`
+          );
+        }
+
         throw new Error(
-          'No captions found via YouTube.js - video may not have captions enabled'
+          'No captions found via YouTube.js - video may not have captions enabled, or YouTube may be blocking the request'
         );
       }
 

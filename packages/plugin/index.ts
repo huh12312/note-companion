@@ -119,7 +119,7 @@ export default class FileOrganizer extends Plugin {
 
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
-    
+
     // Migration: Fix old gpt-4.1-mini model name to gpt-4o-mini
     if (this.settings.selectedModel === "gpt-4.1-mini" as any) {
       this.settings.selectedModel = "gpt-4o-mini";
@@ -242,7 +242,7 @@ export default class FileOrganizer extends Plugin {
 
   async appendFormattedLinkToBackupFile(backupFile: TFile, formattedFile: TFile) {
     const formattedLink = `\n\n---\n[[${formattedFile.path} | Link to formatted file]]`;
-    
+
     await this.app.vault.append(backupFile, formattedLink);
   }
 
@@ -302,6 +302,32 @@ export default class FileOrganizer extends Plugin {
     }
   }
 
+  /**
+   * Cleans up tags in formatted content by removing extra # symbols
+   * Fixes cases where AI generates tags with # that then appear as ## in Obsidian
+   */
+  private cleanupTagsInContent(content: string): string {
+    // Split by lines to process more carefully
+    const lines = content.split('\n');
+    const cleanedLines = lines.map(line => {
+      // Skip markdown headers (lines starting with #)
+      if (/^#{1,6}\s/.test(line)) {
+        return line;
+      }
+
+      // Skip code blocks
+      if (line.trim().startsWith('```')) {
+        return line;
+      }
+
+      // Replace ##tag with #tag (multiple # before a tag word)
+      // This handles cases where AI adds # to tags that already get # from Obsidian
+      return line.replace(/(\s|^)(#{2,})([a-zA-Z0-9_\-]+)/g, '$1#$3');
+    });
+
+    return cleanedLines.join('\n');
+  }
+
   async streamFormatInCurrentNote({
     file,
     formattingInstruction,
@@ -321,7 +347,8 @@ export default class FileOrganizer extends Plugin {
 
       let formattedContent = "";
       const updateCallback = async (partialContent: string) => {
-        formattedContent = partialContent;
+        // Clean up tags before saving
+        formattedContent = this.cleanupTagsInContent(partialContent);
         await this.app.vault.modify(file, formattedContent);
       };
       await this.formatStream(
@@ -447,7 +474,7 @@ export default class FileOrganizer extends Plugin {
       const bytes = new Uint8Array(arrayBuffer);
       const doc = await pdfjsLib.getDocument({ data: bytes }).promise;
       let text = "";
-      
+
       // Use pdfPageLimit to cap the maximum pages read.
       const pageLimit = Math.min(doc.numPages, this.settings.pdfPageLimit);
       for (let pageNum = 1; pageNum <= pageLimit; pageNum++) {
@@ -522,17 +549,17 @@ export default class FileOrganizer extends Plugin {
   ): Promise<Response> {
     const fileSizeInMB = audioBuffer.byteLength / (1024 * 1024);
     const PRESIGNED_URL_THRESHOLD_MB = 4; // Use pre-signed URL for files > 4MB to avoid Vercel limits
-    
+
     // For larger files, use pre-signed URL upload to bypass Vercel body size limit
     if (fileSizeInMB > PRESIGNED_URL_THRESHOLD_MB) {
       return this.transcribeAudioViaPresignedUrl(audioBuffer, fileExtension);
     }
-    
+
     // For smaller files, use direct form data upload
     const formData = new FormData();
     const blob = new Blob([audioBuffer], { type: `audio/${fileExtension}` });
     formData.append("audio", blob, `audio.${fileExtension}`);
-    
+
     const response = await fetch(`${this.getServerUrl()}/api/transcribe`, {
       method: "POST",
       body: formData,
@@ -540,7 +567,7 @@ export default class FileOrganizer extends Plugin {
         Authorization: `Bearer ${this.settings.API_KEY}`,
       },
     });
-    
+
     if (!response.ok) {
       const errorData = await response.json();
       throw new Error(`Transcription failed: ${errorData.error}`);
@@ -554,7 +581,7 @@ export default class FileOrganizer extends Plugin {
   ): Promise<Response> {
     const fileName = `audio-${Date.now()}.${fileExtension}`;
     const mimeType = `audio/${fileExtension}`;
-    
+
     // Step 1: Get pre-signed URL from backend
     const presignedResponse = await fetch(`${this.getServerUrl()}/api/create-upload-url`, {
       method: "POST",
@@ -1226,9 +1253,9 @@ export default class FileOrganizer extends Plugin {
 
   async activateDashboard(): Promise<DashboardView | null> {
     const { workspace } = this.app;
-    
+
     let leaf = workspace.getLeavesOfType(DASHBOARD_VIEW_TYPE)[0];
-    
+
     if (!leaf) {
       const rightLeaf = workspace.getRightLeaf(false);
       if (rightLeaf) {
@@ -1241,7 +1268,7 @@ export default class FileOrganizer extends Plugin {
         return null;
       }
     }
-    
+
     workspace.revealLeaf(leaf);
     return leaf.view as DashboardView;
   }
@@ -1262,12 +1289,12 @@ export default class FileOrganizer extends Plugin {
         this.settings.errorFilePath,
         this.settings.syncFolderPath,
       ];
-      
+
       // Create each folder individually using ensureFolderExists
       for (const folderPath of folderPaths) {
         await ensureFolderExists(this.app, folderPath);
       }
-      
+
       // Show success message
       new Notice("All required folders have been created successfully!", 3000);
     } catch (error) {
@@ -1275,13 +1302,13 @@ export default class FileOrganizer extends Plugin {
       new Notice("There was an error creating the required folders. Please check console for details.", 5000);
     }
   }
-  
+
   async fetchUsageStats(): Promise<UsageData | null> {
     try {
       if (!this.settings.API_KEY) {
         return null;
       }
-      
+
       // Try the public-usage endpoint first (works even with token limits)
       try {
         const publicResponse = await fetch(`${this.getServerUrl()}/api/public-usage`, {
@@ -1291,17 +1318,17 @@ export default class FileOrganizer extends Plugin {
             "Authorization": `Bearer ${this.settings.API_KEY}`
           },
         });
-        
+
         if (publicResponse.ok) {
           const data = await publicResponse.json();
           return data;
         }
-        
+
         logger.debug("Public usage endpoint failed, trying regular endpoint");
       } catch (error) {
         logger.debug("Error fetching from public usage endpoint, trying regular endpoint");
       }
-      
+
       // Fall back to the regular endpoint
       const response = await fetch(`${this.getServerUrl()}/api/usage`, {
         method: "GET",
@@ -1310,13 +1337,13 @@ export default class FileOrganizer extends Plugin {
           "Authorization": `Bearer ${this.settings.API_KEY}`
         },
       });
-      
+
       if (!response.ok) {
         // Special handling for token limit errors (429)
         if (response.status === 429) {
           // Get the error message
           const errorData = await response.json();
-          
+
           // If we got a token limit error, create a synthetic response
           // with maxed out usage data
           if (errorData.error && errorData.error.includes("Token limit exceeded")) {
@@ -1329,14 +1356,14 @@ export default class FileOrganizer extends Plugin {
                   "Authorization": `Bearer ${this.settings.API_KEY}`
                 },
               });
-              
+
               if (publicResponse.ok) {
                 return await publicResponse.json();
               }
             } catch (e) {
               logger.debug("Failed to get public usage after token limit error", e);
             }
-            
+
             // Fallback if public API also fails
             return {
               tokenUsage: 100000, // Some large number
@@ -1347,13 +1374,13 @@ export default class FileOrganizer extends Plugin {
             };
           }
         }
-        
+
         throw new Error(`Failed to fetch usage stats: ${response.status}`);
       }
-      
+
       const data = await response.json();
       return data;
-      
+
     } catch (error) {
       logger.error("Failed to fetch usage statistics", error);
       return null;
@@ -1363,17 +1390,17 @@ export default class FileOrganizer extends Plugin {
   openUpgradePlanModal() {
     // Get the server domain from settings
     const serverUrl = this.getServerUrl();
-    
+
     // Extract the domain from the full server URL
     // This pattern transforms "https://app.notecompanion.ai/api" into "https://app.notecompanion.ai"
     const serverDomain = serverUrl.replace(/\/api\/?$/, '');
-    
+
     // Use the server domain for the upgrade URL
     const upgradeUrl = `${serverDomain}/onboarding`;
-    
+
     // Log the URL being opened (helpful for debugging)
     logger.debug(`Opening upgrade plan URL: ${upgradeUrl}`);
-    
+
     // Open the URL in a browser
     window.open(upgradeUrl, '_blank');
   }

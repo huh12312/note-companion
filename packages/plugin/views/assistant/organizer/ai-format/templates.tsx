@@ -110,6 +110,13 @@ export const ClassificationContainer: React.FC<ClassificationBoxProps> = ({
           videoTitle
         ) {
           try {
+            console.log("[YouTube Format] Attempting to rename file with title:", {
+              videoTitle,
+              videoId,
+              currentFileName: file.name,
+              parentPath: file.parent?.path,
+            });
+
             // Sanitize the title for use as a filename
             const sanitizedTitle = videoTitle
               .replace(/[<>:"/\\|?*]/g, "") // Remove invalid filename characters
@@ -123,25 +130,91 @@ export const ClassificationContainer: React.FC<ClassificationBoxProps> = ({
               ""
             );
 
+            console.log("[YouTube Format] Rename check:", {
+              sanitizedTitle,
+              newFileName,
+              currentFileName: file.name,
+              newPath,
+              willRename: sanitizedTitle && newFileName !== file.name,
+            });
+
             // Only rename if the title is different and valid
             if (
               sanitizedTitle &&
-              newFileName !== file.name &&
-              !(await plugin.app.vault.adapter.exists(newPath))
+              newFileName !== file.name
             ) {
-              await plugin.app.fileManager.renameFile(file, newPath);
-              targetFile = plugin.app.vault.getAbstractFileByPath(
-                newPath
-              ) as TFile;
-              if (!targetFile) {
-                targetFile = file; // Fallback to original if rename failed
+              const pathExists = await plugin.app.vault.adapter.exists(newPath);
+              console.log("[YouTube Format] Path exists check:", {
+                newPath,
+                exists: pathExists,
+              });
+
+              if (!pathExists) {
+                await plugin.app.fileManager.renameFile(file, newPath);
+                targetFile = plugin.app.vault.getAbstractFileByPath(
+                  newPath
+                ) as TFile;
+                if (!targetFile) {
+                  targetFile = file; // Fallback to original if rename failed
+                  console.warn("[YouTube Format] Rename failed: targetFile not found after rename");
+                } else {
+                  console.log("[YouTube Format] Successfully renamed file:", newFileName);
+                  logger.info(`Renamed file to match video title: ${newFileName}`);
+                }
+              } else {
+                // File with that name already exists - try to find a unique name
+                let uniquePath = newPath;
+                let counter = 1;
+                const baseName = sanitizedTitle;
+                const parentDir = file.parent?.path || "";
+
+                while (await plugin.app.vault.adapter.exists(uniquePath)) {
+                  const uniqueFileName = `${baseName} (${counter}).md`;
+                  uniquePath = `${parentDir}/${uniqueFileName}`.replace(/^\/+/, "");
+                  counter++;
+
+                  // Safety limit to prevent infinite loops
+                  if (counter > 100) {
+                    console.warn("[YouTube Format] Too many duplicate files, keeping original name");
+                    break;
+                  }
+                }
+
+                if (counter <= 100) {
+                  await plugin.app.fileManager.renameFile(file, uniquePath);
+                  targetFile = plugin.app.vault.getAbstractFileByPath(
+                    uniquePath
+                  ) as TFile;
+                  if (!targetFile) {
+                    targetFile = file;
+                    console.warn("[YouTube Format] Rename failed: targetFile not found after rename");
+                  } else {
+                    console.log("[YouTube Format] Successfully renamed file with unique name:", uniquePath);
+                    logger.info(`Renamed file to match video title: ${uniquePath}`);
+                  }
+                } else {
+                  console.warn("[YouTube Format] Cannot rename: too many duplicate files exist");
+                }
               }
-              logger.info(`Renamed file to match video title: ${newFileName}`);
+            } else {
+              console.log("[YouTube Format] Skipping rename:", {
+                reason: !sanitizedTitle ? "no sanitized title" : "filename unchanged",
+                sanitizedTitle,
+                newFileName,
+                currentFileName: file.name,
+              });
             }
           } catch (error) {
+            console.error("[YouTube Format] Error during rename:", error);
             logger.warn("Failed to rename file with video title:", error);
             // Continue with original filename
           }
+        } else {
+          console.log("[YouTube Format] Not renaming - conditions not met:", {
+            isYouTubeTemplate: templateName === "youtube_video" || templateName === "youtube_video.md",
+            hasVideoId: !!videoId,
+            hasVideoTitle: !!videoTitle,
+          });
         }
 
         await plugin.streamFormatInCurrentNote({
