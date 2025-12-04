@@ -1,7 +1,7 @@
-"use client";
+'use client';
 
-import { Plus, Minus } from "lucide-react";
-import { useState } from "react";
+import { Plus, Minus } from 'lucide-react';
+import { useState } from 'react';
 
 const FaqItem = ({
   question,
@@ -88,8 +88,8 @@ export function FaqSection() {
 
 <strong>Contact Us</strong>
   Have questions or concerns about your privacy? Reach out to us at:
-  • Email: ben@notecompanion.ai
-  • Discord: ben@notecompanion.ai`}
+  • Email: <a href="mailto:notecompanionteam@gmail.com" class="text-accent underline hover:no-underline">notecompanionteam@gmail.com</a>
+  • Discord: <a href="https://discord.com/invite/udQnCRFyus" class="text-accent underline hover:no-underline">Join our Discord server</a>`}
           />
         </div>
       </div>
