@@ -1,20 +1,20 @@
-'use client'
-import * as React from "react";
-import { useState, useEffect } from "react";
-import { FileCard } from "./FileCard";
-import type { UploadedFile } from "@/drizzle/schema";
-import { Button } from "@/components/ui/button";
+'use client';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
+import { FileCard } from './FileCard';
+import type { UploadedFile } from '@/drizzle/schema';
+import { Button } from '@/components/ui/button';
 
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Loader2, 
-  Search, 
-  RefreshCw, 
-  Filter, 
-  Grid, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Loader2,
+  Search,
+  RefreshCw,
+  Filter,
+  Grid,
   List,
-  ArrowUpDown, 
+  ArrowUpDown,
   Clock,
   Copy,
   Check,
@@ -22,15 +22,21 @@ import {
   FileImage,
   Eye,
   Download,
-  CloudUpload
-} from "lucide-react";
+  CloudUpload,
+} from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { getFiles, deleteFile } from "../actions";
-import { cn } from "@/lib/utils";
-import { Input } from "@/components/ui/input";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { StatusBadge } from "./StatusBadge";
+import { getFiles, deleteFile } from '../actions';
+import { cn } from '@/lib/utils';
+import { Input } from '@/components/ui/input';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { StatusBadge } from './StatusBadge';
 
 interface FileListProps {
   pageSize?: number;
@@ -43,9 +49,9 @@ interface PaginationData {
   totalPages: number;
 }
 
-type ViewMode = "grid" | "list";
-type SortBy = "date" | "name" | "type";
-type SortOrder = "asc" | "desc";
+type ViewMode = 'grid' | 'list';
+type SortBy = 'date' | 'name' | 'type';
+type SortOrder = 'asc' | 'desc';
 
 export function FileList({ pageSize = 12 }: FileListProps) {
   const [page, setPage] = useState(1);
@@ -55,12 +61,12 @@ export function FileList({ pageSize = 12 }: FileListProps) {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pagination, setPagination] = useState<PaginationData | null>(null);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [typeFilter, setTypeFilter] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<ViewMode>("grid");
-  const [sortBy, setSortBy] = useState<SortBy>("date");
-  const [sortOrder, setSortOrder] = useState<SortOrder>("desc");
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [sortBy, setSortBy] = useState<SortBy>('date');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
   const [selectedFile, setSelectedFile] = useState<UploadedFile | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -73,20 +79,27 @@ export function FileList({ pageSize = 12 }: FileListProps) {
         setRefreshing(true);
       }
       setError(null);
-      
+
       // Use server action instead of fetch
       const result = await getFiles({ page, limit: pageSize });
-      
+
       if ('error' in result) {
         throw new Error(result.error);
       }
-      
+
       setFiles(result.files as UploadedFile[]);
-      filterAndSortFiles(result.files as UploadedFile[], searchQuery, statusFilter, typeFilter, sortBy, sortOrder);
+      filterAndSortFiles(
+        result.files as UploadedFile[],
+        searchQuery,
+        statusFilter,
+        typeFilter,
+        sortBy,
+        sortOrder
+      );
       setPagination(result.pagination);
     } catch (err) {
-      setError("Failed to load files. Please try again.");
-      console.error("Error fetching files:", err);
+      setError('Failed to load files. Please try again.');
+      console.error('Error fetching files:', err);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -94,39 +107,41 @@ export function FileList({ pageSize = 12 }: FileListProps) {
   };
 
   const filterAndSortFiles = (
-    filesArray: UploadedFile[], 
-    query: string, 
-    status: string | null, 
+    filesArray: UploadedFile[],
+    query: string,
+    status: string | null,
     type: string | null,
     sort: SortBy,
     order: SortOrder
   ) => {
     // Apply filters
-    let result = filesArray.filter(file => {
-      const matchesSearch = query 
-        ? file.originalName.toLowerCase().includes(query.toLowerCase()) || 
-          (file.textContent && file.textContent.toLowerCase().includes(query.toLowerCase()))
+    let result = filesArray.filter((file) => {
+      const matchesSearch = query
+        ? file.originalName.toLowerCase().includes(query.toLowerCase()) ||
+          (file.textContent &&
+            file.textContent.toLowerCase().includes(query.toLowerCase()))
         : true;
-      
+
       const matchesStatus = status ? file.status === status : true;
       const matchesType = type ? file.fileType.includes(type) : true;
-      
+
       return matchesSearch && matchesStatus && matchesType;
     });
 
     // Apply sort
     result = [...result].sort((a, b) => {
       let comparison = 0;
-      
-      if (sort === "date") {
-        comparison = new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
-      } else if (sort === "name") {
+
+      if (sort === 'date') {
+        comparison =
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      } else if (sort === 'name') {
         comparison = a.originalName.localeCompare(b.originalName);
-      } else if (sort === "type") {
+      } else if (sort === 'type') {
         comparison = a.fileType.localeCompare(b.fileType);
       }
 
-      return order === "asc" ? -comparison : comparison;
+      return order === 'asc' ? -comparison : comparison;
     });
 
     setFilteredFiles(result);
@@ -137,22 +152,29 @@ export function FileList({ pageSize = 12 }: FileListProps) {
   }, [page, pageSize]);
 
   useEffect(() => {
-    filterAndSortFiles(files, searchQuery, statusFilter, typeFilter, sortBy, sortOrder);
+    filterAndSortFiles(
+      files,
+      searchQuery,
+      statusFilter,
+      typeFilter,
+      sortBy,
+      sortOrder
+    );
   }, [searchQuery, statusFilter, typeFilter, sortBy, sortOrder]);
 
   const handleDelete = async (id: number) => {
     try {
       // Use server action instead of fetch
       const result = await deleteFile(id);
-      
+
       if (!result.success) {
-        throw new Error(result.error || "Failed to delete file");
+        throw new Error(result.error || 'Failed to delete file');
       }
-      
+
       // Refresh the file list
       fetchFiles();
     } catch (err) {
-      console.error("Error deleting file:", err);
+      console.error('Error deleting file:', err);
       // Show error toast or message
     }
   };
@@ -164,7 +186,7 @@ export function FileList({ pageSize = 12 }: FileListProps) {
 
   const handleExternalView = (file: UploadedFile) => {
     // Open file preview or download in a new tab
-    window.open(file.blobUrl, "_blank");
+    window.open(file.blobUrl, '_blank');
   };
 
   const handleRefresh = () => {
@@ -172,12 +194,12 @@ export function FileList({ pageSize = 12 }: FileListProps) {
   };
 
   const toggleSortOrder = () => {
-    setSortOrder(current => current === "asc" ? "desc" : "asc");
+    setSortOrder((current) => (current === 'asc' ? 'desc' : 'asc'));
   };
 
   const getUniqueFileTypes = () => {
     const types = new Set<string>();
-    files.forEach(file => {
+    files.forEach((file) => {
       if (file.fileType.includes('image')) {
         types.add('image');
       } else if (file.fileType.includes('pdf')) {
@@ -190,7 +212,7 @@ export function FileList({ pageSize = 12 }: FileListProps) {
   };
 
   const getUniqueStatuses = () => {
-    return Array.from(new Set(files.map(file => file.status)));
+    return Array.from(new Set(files.map((file) => file.status)));
   };
 
   const renderFilterBar = () => (
@@ -206,11 +228,11 @@ export function FileList({ pageSize = 12 }: FileListProps) {
           />
         </div>
         <div className="flex gap-2">
-          <Button 
-            variant="ghost" 
-            size="sm" 
+          <Button
+            variant="ghost"
+            size="sm"
             onClick={handleRefresh}
-            className={cn("h-10 px-2", refreshing && "animate-spin")}
+            className={cn('h-10 px-2', refreshing && 'animate-spin')}
           >
             <RefreshCw className="h-4 w-4" />
           </Button>
@@ -229,17 +251,19 @@ export function FileList({ pageSize = 12 }: FileListProps) {
                 <div>
                   <label className="text-sm font-medium">Status</label>
                   <div className="flex flex-wrap gap-2 mt-2">
-                    <Button 
-                      variant={statusFilter === null ? "default" : "outline"} 
+                    <Button
+                      variant={statusFilter === null ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setStatusFilter(null)}
                     >
                       All
                     </Button>
-                    {getUniqueStatuses().map(status => (
+                    {getUniqueStatuses().map((status) => (
                       <Button
                         key={status}
-                        variant={statusFilter === status ? "default" : "outline"}
+                        variant={
+                          statusFilter === status ? 'default' : 'outline'
+                        }
                         size="sm"
                         onClick={() => setStatusFilter(status)}
                       >
@@ -251,17 +275,17 @@ export function FileList({ pageSize = 12 }: FileListProps) {
                 <div>
                   <label className="text-sm font-medium">File Type</label>
                   <div className="flex flex-wrap gap-2 mt-2">
-                    <Button 
-                      variant={typeFilter === null ? "default" : "outline"} 
+                    <Button
+                      variant={typeFilter === null ? 'default' : 'outline'}
                       size="sm"
                       onClick={() => setTypeFilter(null)}
                     >
                       All
                     </Button>
-                    {getUniqueFileTypes().map(type => (
+                    {getUniqueFileTypes().map((type) => (
                       <Button
                         key={type}
-                        variant={typeFilter === type ? "default" : "outline"}
+                        variant={typeFilter === type ? 'default' : 'outline'}
                         size="sm"
                         onClick={() => setTypeFilter(type)}
                       >
@@ -281,10 +305,10 @@ export function FileList({ pageSize = 12 }: FileListProps) {
             variant="ghost"
             size="sm"
             className={cn(
-              "rounded-r-none",
-              sortBy === "date" && "bg-slate-100"
+              'rounded-r-none',
+              sortBy === 'date' && 'bg-slate-100'
             )}
-            onClick={() => setSortBy("date")}
+            onClick={() => setSortBy('date')}
           >
             Date
           </Button>
@@ -292,10 +316,10 @@ export function FileList({ pageSize = 12 }: FileListProps) {
             variant="ghost"
             size="sm"
             className={cn(
-              "rounded-none border-x",
-              sortBy === "name" && "bg-slate-100"
+              'rounded-none border-x',
+              sortBy === 'name' && 'bg-slate-100'
             )}
-            onClick={() => setSortBy("name")}
+            onClick={() => setSortBy('name')}
           >
             Name
           </Button>
@@ -303,10 +327,10 @@ export function FileList({ pageSize = 12 }: FileListProps) {
             variant="ghost"
             size="sm"
             className={cn(
-              "rounded-l-none",
-              sortBy === "type" && "bg-slate-100"
+              'rounded-l-none',
+              sortBy === 'type' && 'bg-slate-100'
             )}
-            onClick={() => setSortBy("type")}
+            onClick={() => setSortBy('type')}
           >
             Type
           </Button>
@@ -317,20 +341,22 @@ export function FileList({ pageSize = 12 }: FileListProps) {
           onClick={toggleSortOrder}
           className="h-9 w-9"
         >
-          <ArrowUpDown className={cn(
-            "h-4 w-4 transition-transform",
-            sortOrder === "asc" ? "rotate-0" : "rotate-180"
-          )} />
+          <ArrowUpDown
+            className={cn(
+              'h-4 w-4 transition-transform',
+              sortOrder === 'asc' ? 'rotate-0' : 'rotate-180'
+            )}
+          />
         </Button>
         <div className="flex border rounded-md">
           <Button
             variant="ghost"
             size="icon"
             className={cn(
-              "rounded-r-none h-9 w-9",
-              viewMode === "grid" && "bg-slate-100"
+              'rounded-r-none h-9 w-9',
+              viewMode === 'grid' && 'bg-slate-100'
             )}
-            onClick={() => setViewMode("grid")}
+            onClick={() => setViewMode('grid')}
           >
             <Grid className="h-4 w-4" />
           </Button>
@@ -338,10 +364,10 @@ export function FileList({ pageSize = 12 }: FileListProps) {
             variant="ghost"
             size="icon"
             className={cn(
-              "rounded-l-none border-l h-9 w-9", 
-              viewMode === "list" && "bg-slate-100"
+              'rounded-l-none border-l h-9 w-9',
+              viewMode === 'list' && 'bg-slate-100'
             )}
-            onClick={() => setViewMode("list")}
+            onClick={() => setViewMode('list')}
           >
             <List className="h-4 w-4" />
           </Button>
@@ -367,13 +393,13 @@ export function FileList({ pageSize = 12 }: FileListProps) {
               {new Date(selectedFile.createdAt).toLocaleString()}
             </p>
           </DialogHeader>
-          
+
           <div className="flex-1 overflow-auto p-4 bg-slate-50 rounded-md">
             {selectedFile.fileType.includes('image') ? (
               <div className="flex justify-center items-center h-full bg-white p-4 rounded-lg shadow-sm">
-                <img 
-                  src={selectedFile.blobUrl} 
-                  alt={selectedFile.originalName} 
+                <img
+                  src={selectedFile.blobUrl}
+                  alt={selectedFile.originalName}
                   className="max-h-full max-w-full object-contain"
                 />
               </div>
@@ -382,14 +408,19 @@ export function FileList({ pageSize = 12 }: FileListProps) {
                 <div className="bg-white shadow-sm rounded-lg p-8 my-4">
                   <div className="mb-6 pb-4 border-b flex justify-between items-start">
                     <div>
-                      <h2 className="text-lg font-medium">{selectedFile.originalName}</h2>
+                      <h2 className="text-lg font-medium">
+                        {selectedFile.originalName}
+                      </h2>
                       <div className="flex items-center gap-3 mt-2 text-sm text-gray-500">
                         <div className="flex items-center">
                           <Clock className="h-3.5 w-3.5 mr-1" />
                           {new Date(selectedFile.createdAt).toLocaleString()}
                         </div>
                         <div>•</div>
-                        <div>{selectedFile.fileType.split('/')[1] || selectedFile.fileType}</div>
+                        <div>
+                          {selectedFile.fileType.split('/')[1] ||
+                            selectedFile.fileType}
+                        </div>
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -398,7 +429,9 @@ export function FileList({ pageSize = 12 }: FileListProps) {
                         size="sm"
                         className="flex items-center gap-1 h-8"
                         onClick={() => {
-                          navigator.clipboard.writeText(selectedFile.textContent || '');
+                          navigator.clipboard.writeText(
+                            selectedFile.textContent || ''
+                          );
                           setCopied(true);
                           setTimeout(() => setCopied(false), 2000);
                         }}
@@ -415,9 +448,9 @@ export function FileList({ pageSize = 12 }: FileListProps) {
                           </>
                         )}
                       </Button>
-                      
-                      <Button 
-                        variant="outline" 
+
+                      <Button
+                        variant="outline"
                         size="sm"
                         className="flex items-center gap-1 h-8"
                         onClick={() => handleExternalView(selectedFile)}
@@ -427,31 +460,32 @@ export function FileList({ pageSize = 12 }: FileListProps) {
                       </Button>
                     </div>
                   </div>
-                  
+
                   <div className="prose prose-sm max-w-none text-gray-800 leading-relaxed">
                     {/* Check if the content is likely markdown */}
-                    {selectedFile.textContent.includes('#') || 
-                     selectedFile.textContent.includes('**') || 
-                     selectedFile.textContent.includes('- ') ||
-                     selectedFile.textContent.includes('```') ||
-                     selectedFile.originalName.endsWith('.md') ? (
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                      >
+                    {selectedFile.textContent.includes('#') ||
+                    selectedFile.textContent.includes('**') ||
+                    selectedFile.textContent.includes('- ') ||
+                    selectedFile.textContent.includes('```') ||
+                    selectedFile.originalName.endsWith('.md') ? (
+                      // @ts-expect-error - react-markdown types not fully compatible with React 19
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>
                         {selectedFile.textContent}
                       </ReactMarkdown>
                     ) : (
                       /* For plain text, render with proper paragraphs */
-                      selectedFile.textContent.split('\n\n').map((paragraph, i) => (
-                        <p key={i} className="mb-4 text-base">
-                          {paragraph.split('\n').map((line, j) => (
-                            <React.Fragment key={j}>
-                              {line}
-                              {j < paragraph.split('\n').length - 1 && <br />}
-                            </React.Fragment>
-                          ))}
-                        </p>
-                      ))
+                      selectedFile.textContent
+                        .split('\n\n')
+                        .map((paragraph, i) => (
+                          <p key={i} className="mb-4 text-base">
+                            {paragraph.split('\n').map((line, j) => (
+                              <React.Fragment key={j}>
+                                {line}
+                                {j < paragraph.split('\n').length - 1 && <br />}
+                              </React.Fragment>
+                            ))}
+                          </p>
+                        ))
                     )}
                   </div>
                 </div>
@@ -459,8 +493,8 @@ export function FileList({ pageSize = 12 }: FileListProps) {
             ) : (
               <div className="flex flex-col items-center justify-center h-full">
                 <p className="text-muted-foreground">No preview available</p>
-                <Button 
-                  variant="outline" 
+                <Button
+                  variant="outline"
                   className="mt-4"
                   onClick={() => handleExternalView(selectedFile)}
                 >
@@ -469,7 +503,7 @@ export function FileList({ pageSize = 12 }: FileListProps) {
               </div>
             )}
           </div>
-          
+
           <div className="flex justify-end p-4 border-t bg-white">
             {selectedFile.fileType.includes('image') && (
               <Button
@@ -510,14 +544,19 @@ export function FileList({ pageSize = 12 }: FileListProps) {
           <CloudUpload className="h-10 w-10 text-violet-500" />
         </div>
         <div className="max-w-md">
-          <h3 className="text-xl font-semibold mb-2">Welcome to Note Companion Sync</h3>
+          <h3 className="text-xl font-semibold mb-2">
+            Welcome to Note Companion Sync
+          </h3>
           <p className="text-gray-600 mb-4">
-            Note Companion Sync is a secure way to create OCR from your images and documents.
+            Note Companion Sync is a secure way to create OCR from your images
+            and documents.
           </p>
           <div className="flex flex-col space-y-2 items-center">
             <div className="flex items-center bg-blue-50 p-2 rounded-lg">
               <Clock className="h-5 w-5 text-blue-500 mr-2" />
-              <span className="text-sm text-blue-700">Coming soon: Easy screenshot capturing with our mobile app</span>
+              <span className="text-sm text-blue-700">
+                Coming soon: Easy screenshot capturing with our mobile app
+              </span>
             </div>
           </div>
         </div>
@@ -528,15 +567,17 @@ export function FileList({ pageSize = 12 }: FileListProps) {
   return (
     <div className="space-y-6">
       {renderFilterBar()}
-      
+
       {filteredFiles.length === 0 ? (
         <div className="bg-slate-50 rounded-lg p-12 text-center">
-          <p className="text-muted-foreground">No files match your search criteria</p>
-          <Button 
-            variant="outline" 
+          <p className="text-muted-foreground">
+            No files match your search criteria
+          </p>
+          <Button
+            variant="outline"
             className="mt-4"
             onClick={() => {
-              setSearchQuery("");
+              setSearchQuery('');
               setStatusFilter(null);
               setTypeFilter(null);
             }}
@@ -544,14 +585,10 @@ export function FileList({ pageSize = 12 }: FileListProps) {
             Clear filters
           </Button>
         </div>
-      ) : viewMode === "grid" ? (
+      ) : viewMode === 'grid' ? (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {filteredFiles.map((file) => (
-            <FileCard
-              key={file.id}
-              file={file}
-              onView={handleView}
-            />
+            <FileCard key={file.id} file={file} onView={handleView} />
           ))}
         </div>
       ) : (
@@ -568,9 +605,9 @@ export function FileList({ pageSize = 12 }: FileListProps) {
             </thead>
             <tbody>
               {filteredFiles.map((file) => (
-                <tr 
-                  key={file.id} 
-                  className="border-t hover:bg-slate-50 cursor-pointer" 
+                <tr
+                  key={file.id}
+                  className="border-t hover:bg-slate-50 cursor-pointer"
                   onClick={() => handleView(file)}
                 >
                   <td className="p-3">
@@ -580,23 +617,30 @@ export function FileList({ pageSize = 12 }: FileListProps) {
                       ) : (
                         <FileText className="h-5 w-5 text-amber-500" />
                       )}
-                      <span className="font-medium truncate max-w-[200px]" title={file.originalName}>
+                      <span
+                        className="font-medium truncate max-w-[200px]"
+                        title={file.originalName}
+                      >
                         {file.originalName}
                       </span>
                     </div>
                   </td>
-                  <td className="p-3 text-sm">{file.fileType.split('/')[1] || file.fileType}</td>
-                  <td className="p-3"><StatusBadge status={file.status} /></td>
+                  <td className="p-3 text-sm">
+                    {file.fileType.split('/')[1] || file.fileType}
+                  </td>
+                  <td className="p-3">
+                    <StatusBadge status={file.status} />
+                  </td>
                   <td className="p-3 text-sm">
                     {new Intl.DateTimeFormat('en-US', {
                       dateStyle: 'short',
-                      timeStyle: 'short'
+                      timeStyle: 'short',
                     }).format(new Date(file.createdAt))}
                   </td>
                   <td className="p-3 text-right">
                     <div className="flex justify-end">
-                      <Button 
-                        variant="ghost" 
+                      <Button
+                        variant="ghost"
                         size="sm"
                         onClick={(e) => {
                           e.stopPropagation();
@@ -614,7 +658,7 @@ export function FileList({ pageSize = 12 }: FileListProps) {
           </table>
         </div>
       )}
-      
+
       {pagination && pagination.totalPages > 1 && (
         <div className="flex items-center justify-center space-x-4 mt-6">
           <Button
@@ -629,7 +673,8 @@ export function FileList({ pageSize = 12 }: FileListProps) {
           </Button>
           <div className="flex items-center">
             <span className="text-sm">
-              Page <span className="font-medium">{page}</span> of <span className="font-medium">{pagination.totalPages}</span>
+              Page <span className="font-medium">{page}</span> of{' '}
+              <span className="font-medium">{pagination.totalPages}</span>
             </span>
           </div>
           <Button
@@ -644,7 +689,7 @@ export function FileList({ pageSize = 12 }: FileListProps) {
           </Button>
         </div>
       )}
-      
+
       {renderFilePreview()}
     </div>
   );
