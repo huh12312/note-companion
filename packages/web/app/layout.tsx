@@ -1,15 +1,15 @@
-import { ClerkProvider } from "@clerk/nextjs";
-import type { Metadata } from "next";
-import { PHProvider } from "./providers";
-import AuthLayoutWrapper from "@/components/auth-layout-wrapper";
+import { ClerkProvider } from '@clerk/nextjs';
+import type { Metadata } from 'next';
+import { PHProvider } from './providers';
+import AuthLayoutWrapper from '@/components/auth-layout-wrapper';
 
-import "./globals.css";
-import Link from "next/link";
-import ExtraUserSettings from "@/components/user-management";
+import './globals.css';
+import Link from 'next/link';
+import ExtraUserSettings from '@/components/user-management';
 
 export const metadata: Metadata = {
-  title: "Note Companion - Dashboard",
-  description: "Manage your account",
+  title: 'Note Companion - Dashboard',
+  description: 'Manage your account',
 };
 
 export default function RootLayout({
@@ -17,23 +17,24 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const enableUserManagement = process.env.ENABLE_USER_MANAGEMENT === "true";
+  const enableUserManagement = process.env.ENABLE_USER_MANAGEMENT === 'true';
+  const hasClerkKey = !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY;
 
-  if (!enableUserManagement) {
-     return (
-        <html lang="en" className="light">
-            <body className="light">{children}</body>
-        </html>
-     );
+  if (!enableUserManagement || !hasClerkKey) {
+    return (
+      <html lang="en" className="light">
+        <body className="light">{children}</body>
+      </html>
+    );
   }
-  
+
   return (
     <ClerkProvider afterSignOutUrl="/sign-in">
       <html lang="en" className="light">
         <body className="light">
-        <PHProvider>
-          <AuthLayoutWrapper>{children}</AuthLayoutWrapper>
-        </PHProvider>
+          <PHProvider>
+            <AuthLayoutWrapper>{children}</AuthLayoutWrapper>
+          </PHProvider>
         </body>
       </html>
     </ClerkProvider>
