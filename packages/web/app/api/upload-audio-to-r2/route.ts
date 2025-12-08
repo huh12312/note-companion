@@ -141,7 +141,9 @@ export async function POST(request: NextRequest) {
               { status: 400 }
             );
           }
-          audioBuffer = Buffer.from(base64Data, "base64").buffer;
+          // Convert Buffer to ArrayBuffer by creating a new ArrayBuffer and copying data
+          const buffer = Buffer.from(base64Data, "base64");
+          audioBuffer = new Uint8Array(buffer).buffer;
           fileExtension = body.extension;
           mimeType = body.contentType || `audio/${fileExtension}`;
         } else {
