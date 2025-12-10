@@ -14,7 +14,10 @@ import crypto from "crypto";
 
 export const maxDuration = 800; // This function can run for a maximum of 5 seconds
 // --- OpenAI Client for Image Generation ---
-const openaiImageClient = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+const openaiImageClient = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  baseURL: process.env.OPENAI_API_BASE || 'https://api.openai.com/v1',
+});
 
 // --- R2/S3 Configuration ---
 const R2_BUCKET = process.env.R2_BUCKET;
@@ -65,7 +68,10 @@ async function processImageWithGPT4one(
 ): Promise<{ textContent: string; tokensUsed: number }> {
   try {
     console.log("Processing image with gpt-4o for OCR...");
-    const openai = createOpenAI({ apiKey: process.env.OPENAI_API_KEY });
+    const openai = createOpenAI({
+      apiKey: process.env.OPENAI_API_KEY,
+      baseURL: process.env.OPENAI_API_BASE || 'https://api.openai.com/v1',
+    });
     console.log(`Processing OCR for image: ${imageUrl}`);
     const { object, usage } = await generateObject({
       model: openai("gpt-4o") as any, // Type assertion for AI SDK v1/v2 compatibility

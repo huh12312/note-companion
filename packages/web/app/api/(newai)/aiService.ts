@@ -165,7 +165,7 @@ export async function generateRelationships(
 
           List of Files:
           ${files.map((file: { name: string }) => `${file.name}`).join(", ")}
-          
+
           Determine which five files are most similar to the active file based on their content. Provide a ranked list of the top 5 similar file names, each on a new line. If no files are similar, return null.`,
   });
 
@@ -265,16 +265,16 @@ export async function classifyDocument(
     prompt: `Given the text content:
 
           "${content}"
-          
+
           and if relevant, the file name:
-          
+
           "${fileName}"
-          
+
           Please identify which of the following document types best matches the content:
-          
+
           Template Types:
           ${templateNames.join(", ")}
-          
+
           If the content clearly matches one of the provided template types, respond with the name of that document type. If the content does not clearly match any of the template types, respond with an empty string.`,
   });
 
@@ -297,13 +297,13 @@ export async function formatDocumentContent(
         Context:
         Time: ${new Date().toISOString()}
 
-        
+
         Content:
         "${content}"
-        
+
         Formatting Instruction:
         "${formattingInstruction}"
-        
+
         `,
   });
 
@@ -336,7 +336,7 @@ export async function identifyConceptsAndFetchChunks(
     1. Identify the key concepts in the document.
     2. For each concept, extract the most relevant chunk of information.
     3. Return a list of concepts, each with its name and associated chunk of information.
-    
+
     Aim to split the document into the fewest atomic chunks possible while capturing all key concepts.`,
   });
 
@@ -392,6 +392,7 @@ export async function generateTranscriptFromAudio(
 ): Promise<string> {
   const openai = new OpenAI({
     apiKey: openaiApiKey,
+    baseURL: process.env.OPENAI_API_BASE || 'https://api.openai.com/v1',
     dangerouslyAllowBrowser: true,
   });
 

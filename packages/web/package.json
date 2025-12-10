@@ -7,7 +7,7 @@
     "build:self-host": "pnpm next build",
     "build:ci": "pnpm next build",
     "build": "pnpm run db:migrate  && pnpm next build",
-    "start": "pnpm next start",
+    "start": "PORT=${PORT:-3000} pnpm next start",
     "lint": "pnpm next lint",
     "test": "jest",
     "test:watch": "jest --watch",

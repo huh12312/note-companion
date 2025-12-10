@@ -28,7 +28,7 @@ export class FileOrganizerSettings {
   ignoreFolders = [""];
   stagingFolder = ".notecompanion/staging";
   enableSelfHosting = false;
-  selfHostingURL = "http://localhost:3000";
+  selfHostingURL = "http://localhost:3010";
 
   useFolderEmbeddings = false;
   useVaultTitles = true;

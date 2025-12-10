@@ -74,17 +74,23 @@ Create a `.env` file with your configuration:
 # Required: At least one AI provider API key
 OPENAI_API_KEY=sk-...your_key_here...
 
+# Optional: Custom OpenAI-compatible API endpoint (for local LLMs like Ollama)
+OPENAI_API_BASE=http://localhost:11434/v1  # Use this for local Ollama instances
+
 # Optional: Additional AI providers
 ANTHROPIC_API_KEY=sk-ant-...your_key_here...
 GOOGLE_GENERATIVE_AI_API_KEY=...your_key_here...
 GROQ_API_KEY=gsk_...your_key_here...
 
 # Optional: Server configuration
-PORT=3010  # Change if needed
+PORT=3010  # Change if needed (now properly respected in production mode)
 NODE_ENV=production
 
 # Optional: For OCR features (handwriting recognition)
 GOOGLE_VISION_API_KEY=...your_key_here...
+
+# Optional: User management (set to 'true' to enable, any other value or unset to disable)
+ENABLE_USER_MANAGEMENT=false  # Disable for self-hosting without authentication
 ```
 
 #### Getting API Keys
@@ -254,11 +260,19 @@ Fastest inference, good for quick processing.
 
 ### Local Models (Ollama)
 
-Run models completely offline.
+Run models completely offline using Ollama or other OpenAI-compatible local LLM servers.
 
 1. Install [Ollama](https://ollama.ai)
 2. Pull a model: `ollama pull llama3`
-3. Set in plugin settings: Model = "llama3", API URL = "http://localhost:11434"
+3. Configure your backend `.env` file:
+   ```env
+   OPENAI_API_KEY="ollama"  # Any dummy value works for local LLMs
+   OPENAI_API_BASE="http://localhost:11434/v1"
+   ```
+4. Restart your backend server after updating `.env`
+5. (Optional) In the plugin's Experiment tab, enable "Local LLM Integration" to use local models in the chat interface
+
+**Note:** The backend will route all AI requests to your local Ollama instance. The plugin's "Server URL" setting in Advanced Settings is for connecting the plugin to your backend server, not for configuring the LLM endpoint.
 
 ## Troubleshooting
 
@@ -275,6 +289,15 @@ Run models completely offline.
 - Double-check your API key in the `.env` file
 - Ensure there are no extra spaces or quotes
 - Restart the server after changing environment variables
+
+#### "ENABLE_USER_MANAGEMENT not working"
+
+- The environment variable is checked with strict comparison: `ENABLE_USER_MANAGEMENT !== 'true'`
+- To disable user management, either:
+  - Set `ENABLE_USER_MANAGEMENT=false` (or any value except `'true'`)
+  - Leave it unset
+- **Important:** You must restart the server after changing `.env` for changes to take effect
+- When disabled, the server will accept any API key and assign a default user ID
 
 #### "Out of memory"
 
@@ -375,14 +398,14 @@ RATE_LIMIT_WINDOW=900000  # 15 minutes in ms
 
 ### Custom Models
 
-You can use custom model endpoints:
+To use custom OpenAI-compatible model endpoints (including local LLMs), configure `OPENAI_API_BASE` in your `.env` file:
 
 ```env
-CUSTOM_MODEL_ENDPOINT=https://your-model-api.com
-CUSTOM_MODEL_API_KEY=your_key
+OPENAI_API_BASE=https://your-model-api.com/v1
+OPENAI_API_KEY=your_key  # Or any dummy value if not required
 ```
 
-Then configure in the plugin settings to use your custom model.
+This will route all AI requests to your custom endpoint. See the "Local Models (Ollama)" section above for an example with Ollama.
 
 ## Getting Help
 
