@@ -31,7 +31,7 @@ export const SimilarFolderBox: React.FC<SimilarFolderBoxProps> = ({
     setSuggestions([]);
     setLoading(true);
     setError(null);
-    // cut content length to only first 50k/4 chars 
+    // cut content length to only first 50k/4 chars
     const truncatedContent = content.slice(0, 50000);
     try {
       const folderSuggestions = await plugin.recommendFolders(
@@ -39,6 +39,12 @@ export const SimilarFolderBox: React.FC<SimilarFolderBoxProps> = ({
         file.path
       );
 
+      // Safety check: ensure folderSuggestions is an array
+      if (!Array.isArray(folderSuggestions)) {
+        logger.error("Error fetching folders: API returned non-array response", folderSuggestions);
+        setError(new Error("Invalid response from server"));
+        return;
+      }
 
       // Get all valid folders
       const validFolders = plugin.getAllUserFolders();

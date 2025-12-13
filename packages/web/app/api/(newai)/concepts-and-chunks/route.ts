@@ -1,9 +1,9 @@
-import { NextResponse, NextRequest } from "next/server";
-import { getModel } from "@/lib/models";
-import { incrementAndLogTokenUsage } from "@/lib/incrementAndLogTokenUsage";
-import { handleAuthorizationV2 } from "@/lib/handleAuthorization";
-import { generateObject, LanguageModel } from "ai";
-import { z } from "zod";
+import { NextResponse, NextRequest } from 'next/server';
+import { getModel } from '@/lib/models';
+import { incrementAndLogTokenUsage } from '@/lib/incrementAndLogTokenUsage';
+import { handleAuthorizationV2 } from '@/lib/handleAuthorization';
+import { generateObject, LanguageModel } from 'ai';
+import { z } from 'zod';
 
 export const maxDuration = 60;
 
@@ -17,9 +17,12 @@ const conceptsSchema = z.object({
   ),
 });
 
-async function identifyConceptsAndChunks(content: string, model: LanguageModel) {
+async function identifyConceptsAndChunks(
+  content: string,
+  model: LanguageModel
+) {
   return generateObject({
-    model,
+    model: model as any, // Type cast for AI SDK v2 compatibility
     schema: conceptsSchema,
     prompt: `Analyze the following content:
 
@@ -29,7 +32,7 @@ async function identifyConceptsAndChunks(content: string, model: LanguageModel) 
     2. For each concept, extract the most relevant chunk of information.
     3. Return a list of concepts, each with its name and associated chunk of information.
     4. Preserve all markdown formatting in the extracted chunks.
-    
+
     Aim to split the document into the fewest atomic chunks possible while capturing all key concepts.`,
   });
 }
@@ -39,12 +42,12 @@ export async function POST(request: NextRequest) {
     const { userId } = await handleAuthorizationV2(request);
     const { content } = await request.json();
     const model = getModel();
-    
-    const response = await identifyConceptsAndChunks(content, model);
+
+    const response = await identifyConceptsAndChunks(content, model as any);
 
     const tokens = response.usage?.totalTokens || 0;
     console.log(
-      "incrementing token usage for concepts-and-chunks",
+      'incrementing token usage for concepts-and-chunks',
       userId,
       tokens
     );

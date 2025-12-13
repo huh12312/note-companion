@@ -369,7 +369,7 @@ export async function POST(req: NextRequest) {
           );
 
           const result = await streamText({
-            model: getResponsesModel(),
+            model: getResponsesModel() as any,
             system: getChatSystemPrompt(contextString, currentDatetime),
             maxSteps: 5,
             messages: coreMessages, // Use converted messages
@@ -553,7 +553,7 @@ export async function POST(req: NextRequest) {
           }
 
           const result = await streamText({
-            model: getModel(),
+            model: getModel() as any,
             system: getChatSystemPrompt(contextString, currentDatetime),
             maxSteps: 5,
             messages: finalCoreMessages, // Use messages with extracted toolCallId/toolName

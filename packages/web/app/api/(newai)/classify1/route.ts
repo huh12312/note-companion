@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
       content,
       fileName,
       templateNames,
-      model
+      model as any // Type cast for compatibility
     );
     // increment tokenUsage
     const tokens = response.usage.totalTokens;

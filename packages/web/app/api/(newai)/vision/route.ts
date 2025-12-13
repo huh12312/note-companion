@@ -14,15 +14,15 @@ export async function POST(request: NextRequest) {
 
     const defaultInstruction = "Extract text from image. If there's a drawing, describe it.";
     const responseInstruction = "Respond with only the extracted text or description.";
-    
-    const promptText = payload.instructions?.trim() 
+
+    const promptText = payload.instructions?.trim()
       ? `${defaultInstruction} ${payload.instructions} ${responseInstruction}`
       : `${defaultInstruction} ${responseInstruction}`;
     console.log("promptText", promptText);
 
 
     const response = await generateText({
-      model,
+      model: model as any,
       messages: [{
         role: "user",
         content: [

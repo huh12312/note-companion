@@ -14,7 +14,7 @@ export async function POST(request: NextRequest) {
     const response = await formatDocumentContent(
       content,
       formattingInstruction,
-      model
+      model as any
     );
     const tokens = response.usage.totalTokens;
     console.log("incrementing token usage format", userId, tokens);

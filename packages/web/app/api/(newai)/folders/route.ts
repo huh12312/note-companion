@@ -13,7 +13,7 @@ export async function POST(request: NextRequest) {
       content,
       fileName,
       folders,
-      model,
+      model as any,
       customInstructions
     );
     // increment tokenUsage

@@ -1085,10 +1085,21 @@ export default class FileOrganizer extends Plugin {
     });
 
     if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(
+        errorData.error || `HTTP error! status: ${response.status}`
+      );
     }
 
-    const { folders: suggestedFolders } = await response.json();
+    const data = await response.json();
+    const suggestedFolders = data.folders || [];
+
+    // Safety check: ensure we return an array
+    if (!Array.isArray(suggestedFolders)) {
+      logger.error("API returned non-array folders:", suggestedFolders);
+      return [];
+    }
+
     return suggestedFolders;
   }
 

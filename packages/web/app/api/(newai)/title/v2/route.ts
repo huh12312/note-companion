@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     } = await request.json();
     const model = getModel();
     const shouldRename = await generateObject({
-      model,
+      model: model as any, // Type cast for AI SDK v2 compatibility
       schema: z.object({
         score: z.number().min(0).max(100),
         shouldRename: z.boolean(),
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
     }
 
     const response = await generateObject({
-      model,
+      model: model as any, // Type cast for AI SDK v2 compatibility
       schema: z.object({
         suggestedTitles: z
           .array(

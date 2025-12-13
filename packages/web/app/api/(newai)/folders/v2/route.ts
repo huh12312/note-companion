@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
       await request.json();
     const model = getModel();
     const response = await generateObject({
-      model,
+      model: model as any, // Type cast for AI SDK v2 compatibility
       schema: z.object({
         suggestedFolders: z
           .array(

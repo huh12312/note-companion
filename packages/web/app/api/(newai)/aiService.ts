@@ -33,7 +33,7 @@ export async function generateTags(
   }
 
   const response = await generateObject({
-    model,
+    model: model as any, // Type cast for AI SDK v2 compatibility
     schema: z.object({
       tags: z.array(z.string().refine(tag => tag.toLowerCase() !== 'none')).length(3),
     }),
@@ -60,7 +60,7 @@ export async function generateExistingTags(
   const prompt = `For "${content}" (file: "${fileName}"), select up to 3 tags from: ${vaultTags.join(", ")}. Only choose tags with an evident link to the main topics that is not too specific. If none meet this criterion, return null.`;
 
   const response = await generateObject({
-    model,
+    model: model as any, // Type cast for AI SDK v2 compatibility
     temperature: 0,
     schema: z.object({
       tags: z.array(z.string()).max(3),
@@ -81,7 +81,7 @@ export async function generateAliasVariations(
   model: LanguageModel
 ) {
   const response = await generateObject({
-    model,
+    model: model as any, // Type cast for AI SDK v2 compatibility
     schema: z.object({
       aliases: z.array(z.string()).default([]),
     }),
@@ -112,7 +112,7 @@ export async function guessRelevantFolder(
 
   // eslint-disable-next-line no-case-declarations
   const response = await generateObject({
-    model,
+    model: model as any, // Type cast for AI SDK v2 compatibility
     schema: z.object({
       suggestedFolder: z.string().nullable(),
     }),
@@ -133,7 +133,7 @@ export async function createNewFolder(
   model: LanguageModel
 ) {
   const response = await generateObject({
-    model,
+    model: model as any, // Type cast for AI SDK v2 compatibility
     schema: z.object({
       newFolderName: z.string(),
     }),
@@ -154,7 +154,7 @@ export async function generateRelationships(
   const modelName = model.modelId;
 
   const response = await generateObject({
-    model,
+    model: model as any, // Type cast for AI SDK v2 compatibility
     schema: z.object({
       similarFiles: z.array(z.string()),
     }),
@@ -192,7 +192,7 @@ export async function generateDocumentTitle(
 
 
   const response = await generateObject({
-    model,
+    model: model as any, // Type cast for AI SDK v2 compatibility
     schema: z.object({
       name: z.string().max(60),
     }),
@@ -229,7 +229,7 @@ export async function extractTextFromImage(
   switch (modelName) {
     case "gpt-4o": {
       const response = await generateText({
-        model,
+        model: model as any, // Type cast for AI SDK v2 compatibility
         //@ts-ignore
         messages,
       });
@@ -256,7 +256,7 @@ export async function classifyDocument(
   model: LanguageModel
 ) {
   const response = await generateObject({
-    model,
+    model: model as any, // Type cast for AI SDK v2 compatibility
     schema: z.object({
       documentType: z.string().optional(),
     }),
@@ -320,7 +320,7 @@ export async function identifyConceptsAndFetchChunks(
   model: LanguageModel
 ) {
   const response = await generateObject({
-    model,
+    model: model as any, // Type cast for AI SDK v2 compatibility
     schema: z.object({
       concepts: z.array(
         z.object({
@@ -346,7 +346,7 @@ export async function identifyConceptsAndFetchChunks(
 // Function to identify concepts in the document
 export async function identifyConcepts(content: string, model: LanguageModel) {
   const response = await generateObject({
-    model,
+    model: model as any, // Type cast for AI SDK v2 compatibility
     schema: z.object({
       concepts: z.array(z.string()),
     }),
@@ -367,7 +367,7 @@ export async function fetchChunksForConcept(
   model: LanguageModel
 ) {
   const response = await generateObject({
-    model,
+    model: model as any, // Type cast for AI SDK v2 compatibility
     schema: z.object({
       content: z.string(),
     }),

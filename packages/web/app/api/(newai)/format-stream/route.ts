@@ -29,7 +29,7 @@ export async function POST(request: NextRequest) {
     }
 
     const result = await streamText({
-      model,
+      model: model as any,
       system: 'Answer directly in markdown',
       messages: [
         {

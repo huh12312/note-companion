@@ -17,21 +17,21 @@ const tagsSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await handleAuthorizationV2(request);
-    const { 
-      content, 
-      fileName, 
-      existingTags = [], 
-      customInstructions = "", 
-      count = 3 
+    const {
+      content,
+      fileName,
+      existingTags = [],
+      customInstructions = "",
+      count = 3
     } = await request.json();
 
     const response = await generateObject({
-      model: getModel(),
+      model: getModel() as any,
       schema: tagsSchema,
       system: `You are a precise tag generator. Analyze content and suggest ${count} relevant tags.
               ${existingTags.length ? `Consider existing tags: ${existingTags.join(", ")}` : 'Create new tags if needed.'}
               ${customInstructions ? `Follow these custom instructions: ${customInstructions}` : ''}
-              
+
               Guidelines:
               - Prefer existing tags when appropriate (score them higher)
               - Create specific, meaningful new tags when needed
@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
               - Include brief reasoning for each tag
               - Focus on key themes, topics, and document type`,
       prompt: `File: "${fileName}"
-              
+
               Content: """
               ${content}
               """`,

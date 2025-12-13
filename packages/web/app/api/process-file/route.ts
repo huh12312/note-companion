@@ -62,11 +62,10 @@ async function processImageWithGPT4one(
     console.log("Processing image with gpt-4o..."); // Use gpt-4o consistently
     const { getModel } = await import("@/lib/models");
     const model = getModel("gpt-4o");
-    
+
     console.log(`Processing image URL: ${imageUrl}`); // Log the URL being sent
     const { object, usage } = await generateObject({
-      //   model: openai("gpt-4.1"), // Ensure this uses gpt-4o if intended
-      model,
+      model: model as any, // Type cast for AI SDK v2 compatibility
       schema: z.object({ markdown: z.string() }),
       messages: [
         {

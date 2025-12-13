@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
     const model = getModel();
 
     const response = await generateObject({
-      model,
+      model: model as any, // Type cast for AI SDK v2 compatibility
       schema: modifySchema,
       system: `You are a precise code and text modification assistant. Follow these guidelines:
 - Make minimal necessary changes to achieve the goal
@@ -57,4 +57,4 @@ Modified content with the text "${content}" applied according to the instruction
       { status: error.status || 500 }
     );
   }
-} 
+}
