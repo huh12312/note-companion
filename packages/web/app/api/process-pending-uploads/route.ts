@@ -1,34 +1,49 @@
-import { NextRequest, NextResponse } from "next/server";
-import { db, uploadedFiles, UploadedFile } from "@/drizzle/schema";
-import { eq, or } from "drizzle-orm";
-import { S3Client, GetObjectCommand, PutObjectCommand } from "@aws-sdk/client-s3";
-import { incrementAndLogTokenUsage } from "@/lib/incrementAndLogTokenUsage";
-import { createOpenAI } from "@ai-sdk/openai";
-import OpenAI, { toFile } from "openai";
-import { generateObject } from "ai";
-import { z } from "zod";
-import fs from "fs";
-import path from "path";
-import os from "os";
-import crypto from "crypto";
+import { NextRequest, NextResponse } from 'next/server';
+import { db, uploadedFiles, UploadedFile } from '@/drizzle/schema';
+import { eq, or } from 'drizzle-orm';
+import {
+  S3Client,
+  GetObjectCommand,
+  PutObjectCommand,
+} from '@aws-sdk/client-s3';
+import { incrementAndLogTokenUsage } from '@/lib/incrementAndLogTokenUsage';
+import { createOpenAI } from '@ai-sdk/openai';
+import OpenAI, { toFile } from 'openai';
+import { generateObject } from 'ai';
+import { z } from 'zod';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
+import crypto from 'crypto';
 
 export const maxDuration = 800; // This function can run for a maximum of 5 seconds
 // --- OpenAI Client for Image Generation ---
-const openaiImageClient = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-  baseURL: process.env.OPENAI_API_BASE || 'https://api.openai.com/v1',
-});
+// Lazy initialization to avoid build-time errors when API key is not set
+function getOpenAIImageClient() {
+  return new OpenAI({
+    apiKey: process.env.OPENAI_API_KEY || '',
+    baseURL: process.env.OPENAI_API_BASE || 'https://api.openai.com/v1',
+  });
+}
 
 // --- R2/S3 Configuration ---
 const R2_BUCKET = process.env.R2_BUCKET;
 const R2_ENDPOINT = process.env.R2_ENDPOINT;
 const R2_ACCESS_KEY_ID = process.env.R2_ACCESS_KEY_ID;
 const R2_SECRET_ACCESS_KEY = process.env.R2_SECRET_ACCESS_KEY;
-const R2_REGION = process.env.R2_REGION || "auto";
+const R2_REGION = process.env.R2_REGION || 'auto';
 const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL;
 
-if (!R2_BUCKET || !R2_ENDPOINT || !R2_ACCESS_KEY_ID || !R2_SECRET_ACCESS_KEY || !R2_PUBLIC_URL) {
-  console.error("Missing R2 environment variables (including R2_PUBLIC_URL) for background worker!");
+if (
+  !R2_BUCKET ||
+  !R2_ENDPOINT ||
+  !R2_ACCESS_KEY_ID ||
+  !R2_SECRET_ACCESS_KEY ||
+  !R2_PUBLIC_URL
+) {
+  console.error(
+    'Missing R2 environment variables (including R2_PUBLIC_URL) for background worker!'
+  );
 }
 
 const r2Client = new S3Client({
@@ -51,7 +66,7 @@ async function downloadFromR2(key: string): Promise<Buffer> {
   try {
     const response = await r2Client.send(command);
     if (!response.Body) {
-      throw new Error("No body received from R2 getObject");
+      throw new Error('No body received from R2 getObject');
     }
     // Convert stream to buffer
     const byteArray = await response.Body.transformToByteArray();
@@ -67,31 +82,31 @@ async function processImageWithGPT4one(
   imageUrl: string
 ): Promise<{ textContent: string; tokensUsed: number }> {
   try {
-    console.log("Processing image with gpt-4o for OCR...");
+    console.log('Processing image with gpt-4o for OCR...');
     const openai = createOpenAI({
       apiKey: process.env.OPENAI_API_KEY,
       baseURL: process.env.OPENAI_API_BASE || 'https://api.openai.com/v1',
     });
     console.log(`Processing OCR for image: ${imageUrl}`);
     const { object, usage } = await generateObject({
-      model: openai("gpt-4o") as any, // Type assertion for AI SDK v1/v2 compatibility
+      model: openai('gpt-4o') as any, // Type assertion for AI SDK v1/v2 compatibility
       schema: z.object({ markdown: z.string() }),
       messages: [
         {
-          role: "system",
-          content: "Extract all text comprehensively, preserving formatting.",
+          role: 'system',
+          content: 'Extract all text comprehensively, preserving formatting.',
         },
-        { role: "user", content: [{ type: "image", image: imageUrl }] },
+        { role: 'user', content: [{ type: 'image', image: imageUrl }] },
       ],
     });
-    const textContent = object.markdown || "";
+    const textContent = object.markdown || '';
     const tokensUsed = usage?.totalTokens ?? Math.ceil(textContent.length / 4);
     console.log(
       `gpt-4o OCR extracted ${textContent.length} chars, used approx ${tokensUsed} tokens`
     );
     return { textContent, tokensUsed };
   } catch (error) {
-    console.error("Error processing image with gpt-4o OCR:", error);
+    console.error('Error processing image with gpt-4o OCR:', error);
     return {
       textContent: `Error processing image OCR: ${
         error instanceof Error ? error.message : String(error)
@@ -102,7 +117,11 @@ async function processImageWithGPT4one(
 }
 
 // Re-add uploadToR2 helper function
-async function uploadToR2(key: string, body: Buffer, contentType: string): Promise<void> {
+async function uploadToR2(
+  key: string,
+  body: Buffer,
+  contentType: string
+): Promise<void> {
   console.log(`Uploading to R2: ${key} (${contentType})`);
   const command = new PutObjectCommand({
     Bucket: R2_BUCKET,
@@ -136,45 +155,65 @@ async function processMagicDiagram(
     // 1. Download original image
     console.log(`Downloading original image from R2 key: ${r2Key}`);
     const originalImageBuffer = await downloadFromR2(r2Key);
-    console.log(`Downloaded ${originalImageBuffer.length} bytes for ${originalFileName}`);
+    console.log(
+      `Downloaded ${originalImageBuffer.length} bytes for ${originalFileName}`
+    );
 
     // 2. Create temporary file path for original image
     const tempDir = os.tmpdir();
     const safeFileName = path.basename(originalFileName);
     const extension = path.extname(safeFileName) || '.png';
-    const tempOriginalFileName = `${Date.now()}-${path.basename(safeFileName, extension)}${extension}`;
+    const tempOriginalFileName = `${Date.now()}-${path.basename(
+      safeFileName,
+      extension
+    )}${extension}`;
     tempImagePath = path.join(tempDir, tempOriginalFileName);
-    console.log(`Writing original image buffer to temporary path: ${tempImagePath}`);
+    console.log(
+      `Writing original image buffer to temporary path: ${tempImagePath}`
+    );
 
     // 3. Write original buffer to temporary file
-    fs.writeFileSync(tempImagePath, originalImageBuffer as unknown as Uint8Array);
+    fs.writeFileSync(
+      tempImagePath,
+      originalImageBuffer as unknown as Uint8Array
+    );
     console.log(`Successfully wrote original buffer to ${tempImagePath}`);
 
     // 4. Prepare generation prompt
     const generationPrompt = `Digitize this sketch image into a clean, well-rendered diagram suitable for digital files. Preserve the core elements and connections shown in the sketch. Original filename for context: ${originalFileName}.`;
-    console.log(`Generating image with prompt: ${generationPrompt.substring(0, 150)}...`);
+    console.log(
+      `Generating image with prompt: ${generationPrompt.substring(0, 150)}...`
+    );
 
     // 5. Create read stream and determine mimetype
-    console.log(`Creating read stream for temporary original image: ${tempImagePath}`);
+    console.log(
+      `Creating read stream for temporary original image: ${tempImagePath}`
+    );
     const imageStream = fs.createReadStream(tempImagePath);
     let mimeType = 'image/png';
     const fileExt = path.extname(tempImagePath).toLowerCase();
     if (fileExt === '.jpg' || fileExt === '.jpeg') {
-        mimeType = 'image/jpeg';
+      mimeType = 'image/jpeg';
     } else if (fileExt === '.webp') {
-        mimeType = 'image/webp';
+      mimeType = 'image/webp';
     }
     console.log(`Determined mimetype: ${mimeType}`);
 
     // 6. Prepare image file using toFile
-    const preparedImage = await toFile(imageStream, path.basename(tempImagePath), {
+    const preparedImage = await toFile(
+      imageStream,
+      path.basename(tempImagePath),
+      {
         type: mimeType,
-    });
-    console.log(`Prepared image for OpenAI API: ${preparedImage.name} with type ${mimeType}`);
+      }
+    );
+    console.log(
+      `Prepared image for OpenAI API: ${preparedImage.name} with type ${mimeType}`
+    );
 
     // 7. Call OpenAI API, requesting b64_json
-    const response = await openaiImageClient.images.edit({
-      model: "gpt-image-1",
+    const response = await getOpenAIImageClient().images.edit({
+      model: 'gpt-image-1',
       image: preparedImage,
       prompt: generationPrompt,
       n: 1,
@@ -182,24 +221,34 @@ async function processMagicDiagram(
 
     // 8. Extract base64 data
     const imageBase64 = response.data[0]?.b64_json;
-    console.log(`Received image data (base64 length: ${imageBase64?.length ?? 0})`);
+    console.log(
+      `Received image data (base64 length: ${imageBase64?.length ?? 0})`
+    );
 
     if (!imageBase64) {
-      console.error("Image generation response data (check for errors):", response.data);
+      console.error(
+        'Image generation response data (check for errors):',
+        response.data
+      );
       throw new Error(
-        "Image generation failed, no b64_json returned in the response."
+        'Image generation failed, no b64_json returned in the response.'
       );
     }
 
     // 9. Decode base64 image
-    const generatedImageBuffer = Buffer.from(imageBase64, "base64");
-    console.log(`Decoded generated image buffer size: ${generatedImageBuffer.length} bytes`);
+    const generatedImageBuffer = Buffer.from(imageBase64, 'base64');
+    console.log(
+      `Decoded generated image buffer size: ${generatedImageBuffer.length} bytes`
+    );
 
     // 10. Generate unique R2 key for the *generated* image
     const uniqueSuffix = crypto.randomBytes(4).toString('hex');
     // Assume generated image is PNG, adjust if API indicates otherwise
     const generatedFileExtension = '.png';
-    const generatedR2Key = `generated/${userId}/${Date.now()}-${uniqueSuffix}-${path.basename(originalFileName, extension)}${generatedFileExtension}`;
+    const generatedR2Key = `generated/${userId}/${Date.now()}-${uniqueSuffix}-${path.basename(
+      originalFileName,
+      extension
+    )}${generatedFileExtension}`;
     console.log(`Generated R2 key for new image: ${generatedR2Key}`);
 
     // 11. Upload generated image buffer to R2
@@ -214,10 +263,9 @@ async function processMagicDiagram(
 
     // 13. Return the new public URL
     return { generatedImageUrl: generatedPublicUrl, tokensUsed };
-
   } catch (error: unknown) {
-    console.error("Error in processMagicDiagram (image generation):", error);
-    let errorMessage = "Unknown error generating diagram image";
+    console.error('Error in processMagicDiagram (image generation):', error);
+    let errorMessage = 'Unknown error generating diagram image';
 
     interface OpenAIErrorDetail {
       message?: string;
@@ -227,7 +275,12 @@ async function processMagicDiagram(
       message?: string;
     }
 
-    if (error && typeof error === 'object' && 'message' in error && !(error instanceof Error)) {
+    if (
+      error &&
+      typeof error === 'object' &&
+      'message' in error &&
+      !(error instanceof Error)
+    ) {
       errorMessage = String(error.message);
     } else if (error instanceof Error) {
       errorMessage = error.message;
@@ -241,21 +294,26 @@ async function processMagicDiagram(
       }
     }
 
-    console.error("Full error object:", error); // Log the full error object for debugging
+    console.error('Full error object:', error); // Log the full error object for debugging
     return {
-      generatedImageUrl: "",
+      generatedImageUrl: '',
       tokensUsed: 0,
       error: `Error generating diagram: ${errorMessage}`,
     };
   } finally {
     // 14. Clean up temporary original image file
     if (tempImagePath) {
-      console.log(`Cleaning up temporary original image file: ${tempImagePath}`);
+      console.log(
+        `Cleaning up temporary original image file: ${tempImagePath}`
+      );
       try {
         fs.unlinkSync(tempImagePath);
         console.log(`Successfully deleted ${tempImagePath}`);
       } catch (cleanupError) {
-        console.error(`Failed to delete temporary file ${tempImagePath}:`, cleanupError);
+        console.error(
+          `Failed to delete temporary file ${tempImagePath}:`,
+          cleanupError
+        );
       }
     }
   }
@@ -263,7 +321,7 @@ async function processMagicDiagram(
 
 // --- Reusable Processing Function ---
 async function processSingleFileRecord(fileRecord: UploadedFile): Promise<{
-  status: "completed" | "error";
+  status: 'completed' | 'error';
   textContent: string | null;
   generatedImageUrl: string | null;
   tokensUsed: number;
@@ -279,16 +337,18 @@ async function processSingleFileRecord(fileRecord: UploadedFile): Promise<{
   // Define r2Key determination logic once at the beginning
   let r2Key = fileRecord.r2Key;
   if (!r2Key) {
-    const urlParts = fileRecord.blobUrl.split("/");
-    const uploadSegmentIndex = urlParts.findIndex((part) => part === "uploads");
+    const urlParts = fileRecord.blobUrl.split('/');
+    const uploadSegmentIndex = urlParts.findIndex((part) => part === 'uploads');
     if (uploadSegmentIndex !== -1 && uploadSegmentIndex < urlParts.length - 1) {
-      r2Key = urlParts.slice(uploadSegmentIndex).join("/");
+      r2Key = urlParts.slice(uploadSegmentIndex).join('/');
       console.log(`[File ${fileId}] Derived R2 key from blobUrl: ${r2Key}`);
     } else {
-      console.error(`[File ${fileId}] Could not determine R2 key from blobUrl: ${fileRecord.blobUrl}`);
+      console.error(
+        `[File ${fileId}] Could not determine R2 key from blobUrl: ${fileRecord.blobUrl}`
+      );
       // Set error and return immediately if r2Key is essential and cannot be derived
       return {
-        status: "error",
+        status: 'error',
         textContent: null,
         generatedImageUrl: null,
         tokensUsed: 0,
@@ -297,38 +357,40 @@ async function processSingleFileRecord(fileRecord: UploadedFile): Promise<{
     }
   }
   if (!r2Key) {
-     // This check might be redundant if the above block handles the error case,
-     // but serves as a safeguard.
-     console.error(`[File ${fileId}] Missing R2 key after derivation attempt.`);
-     return {
-        status: "error",
-        textContent: null,
-        generatedImageUrl: null,
-        tokensUsed: 0,
-        error: `Missing R2 key for file ID ${fileId}`,
-     };
+    // This check might be redundant if the above block handles the error case,
+    // but serves as a safeguard.
+    console.error(`[File ${fileId}] Missing R2 key after derivation attempt.`);
+    return {
+      status: 'error',
+      textContent: null,
+      generatedImageUrl: null,
+      tokensUsed: 0,
+      error: `Missing R2 key for file ID ${fileId}`,
+    };
   }
-   // Log the final R2 key being used
+  // Log the final R2 key being used
   console.log(`[File ${fileId}] Using R2 key: ${r2Key}`);
-
 
   try {
     console.log(`Starting single file processing for ID: ${fileId}`);
-    const processType = fileRecord.processType || "standard-ocr";
+    const processType = fileRecord.processType || 'standard-ocr';
     const fileType = fileRecord.fileType.toLowerCase();
     console.log(`Processing type: ${processType}, File type: ${fileType}`);
-
 
     // Download is now only needed for magic-diagram before calling its function.
     // processImageWithGPT4one uses the blobUrl directly.
 
     // --- Processing Logic ---
     console.log(`Processing file ${fileId} with processType: ${processType}`);
-    if (processType === "magic-diagram" && fileType.startsWith("image/")) {
+    if (processType === 'magic-diagram' && fileType.startsWith('image/')) {
       // --- Magic Diagram Processing (Image Generation) ---
       console.log(`Processing Magic Diagram for ${fileId}`);
       // Pass userId again
-      const result = await processMagicDiagram(r2Key, fileRecord.originalName, userId);
+      const result = await processMagicDiagram(
+        r2Key,
+        fileRecord.originalName,
+        userId
+      );
       if (result.error) {
         processingError = result.error;
         tokensUsed = 0;
@@ -340,68 +402,78 @@ async function processSingleFileRecord(fileRecord: UploadedFile): Promise<{
         textContent = `[Generated Diagram Image](${generatedImageUrl})`;
       }
     } else if (
-      processType === "standard-ocr" &&
-      fileType.startsWith("image/")
+      processType === 'standard-ocr' &&
+      fileType.startsWith('image/')
     ) {
       // --- Standard OCR Processing ---
       // Standard OCR uses the public blobUrl
       if (!fileRecord.blobUrl) {
-           throw new Error(`Missing blobUrl for OCR processing of file ID ${fileId}`);
-       }
-      console.log(`Processing Standard OCR for ${fileId} using blobUrl: ${fileRecord.blobUrl}`);
+        throw new Error(
+          `Missing blobUrl for OCR processing of file ID ${fileId}`
+        );
+      }
+      console.log(
+        `Processing Standard OCR for ${fileId} using blobUrl: ${fileRecord.blobUrl}`
+      );
       const result = await processImageWithGPT4one(fileRecord.blobUrl);
       textContent = result.textContent;
       tokensUsed = result.tokensUsed;
-      if (textContent?.startsWith("Error processing image OCR")) {
+      if (textContent?.startsWith('Error processing image OCR')) {
         processingError = textContent;
         textContent = null;
       } else if (
         !processingError &&
-        (!textContent || textContent.trim() === "")
+        (!textContent || textContent.trim() === '')
       ) {
         console.warn(`No text content extracted for file ${fileId}`);
-        textContent = "[OCR completed, but no text extracted]";
+        textContent = '[OCR completed, but no text extracted]';
       }
       generatedImageUrl = null; // Ensure generated URL is null for OCR
-    } else if (fileType === "application/pdf" || fileType.includes("pdf")) {
-      processingError = "PDF processing not yet implemented.";
-      textContent = "[PDF Content - Processing Pending Implementation]";
+    } else if (fileType === 'application/pdf' || fileType.includes('pdf')) {
+      processingError = 'PDF processing not yet implemented.';
+      textContent = '[PDF Content - Processing Pending Implementation]';
       tokensUsed = 0;
       generatedImageUrl = null;
     } else {
-        // Handle text files explicitly if needed
-         if (fileType === 'text/plain' || fileType === 'text/markdown') {
-             console.log(`Handling plain text/markdown file ${fileId}. Downloading content...`);
-              // Download content for text files
-             const buffer = await downloadFromR2(r2Key);
-             textContent = buffer.toString('utf-8');
-             tokensUsed = 0; // No LLM processing cost for plain text
-             console.log(`Extracted ${textContent.length} chars from text file ${fileId}`);
-             generatedImageUrl = null;
-         } else {
-            processingError = `Unsupported file type/processType: ${fileType} / ${processType}`;
-            textContent = `[Unsupported: ${fileType}]`;
-            tokensUsed = 0;
-            generatedImageUrl = null;
-         }
+      // Handle text files explicitly if needed
+      if (fileType === 'text/plain' || fileType === 'text/markdown') {
+        console.log(
+          `Handling plain text/markdown file ${fileId}. Downloading content...`
+        );
+        // Download content for text files
+        const buffer = await downloadFromR2(r2Key);
+        textContent = buffer.toString('utf-8');
+        tokensUsed = 0; // No LLM processing cost for plain text
+        console.log(
+          `Extracted ${textContent.length} chars from text file ${fileId}`
+        );
+        generatedImageUrl = null;
+      } else {
+        processingError = `Unsupported file type/processType: ${fileType} / ${processType}`;
+        textContent = `[Unsupported: ${fileType}]`;
+        tokensUsed = 0;
+        generatedImageUrl = null;
+      }
     }
     // --- End Processing Logic ---
   } catch (error: unknown) {
     console.error(`Error during single file processing ${fileId}:`, error);
     processingError =
-      error instanceof Error ? error.message : "Unknown processing error";
+      error instanceof Error ? error.message : 'Unknown processing error';
     textContent = null; // Ensure null on error
     generatedImageUrl = null; // Ensure null on error
     tokensUsed = 0;
   }
 
-  const finalStatus = processingError ? "error" : "completed";
+  const finalStatus = processingError ? 'error' : 'completed';
   console.log(
     `Single file processing result for ${fileId}: Status=${finalStatus}, Error=${processingError}, Tokens=${tokensUsed}`
   );
   return {
     status: finalStatus,
-    textContent: processingError ? `[Processing Error: ${processingError}]` : textContent,
+    textContent: processingError
+      ? `[Processing Error: ${processingError}]`
+      : textContent,
     generatedImageUrl: generatedImageUrl,
     tokensUsed: tokensUsed,
     error: processingError,
@@ -412,18 +484,18 @@ async function processSingleFileRecord(fileRecord: UploadedFile): Promise<{
 
 export async function GET(request: NextRequest) {
   // 1. Authorization Check (Using a simple secret header for cron jobs)
-  console.log("[/api/process-pending-uploads] Worker starting..."); // Log worker start
-  const cronSecret = request.headers.get("authorization")?.split(" ")[1];
+  console.log('[/api/process-pending-uploads] Worker starting...'); // Log worker start
+  const cronSecret = request.headers.get('authorization')?.split(' ')[1];
   if (cronSecret !== process.env.CRON_SECRET) {
     console.warn(
-      "[/api/process-pending-uploads] Unauthorized cron job attempt"
+      '[/api/process-pending-uploads] Unauthorized cron job attempt'
     );
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
-  console.log("[/api/process-pending-uploads] Authorized.");
+  console.log('[/api/process-pending-uploads] Authorized.');
 
   console.log(
-    "[/api/process-pending-uploads] Starting background processing job..."
+    '[/api/process-pending-uploads] Starting background processing job...'
   );
   let processedCount = 0;
   let errorCount = 0;
@@ -431,7 +503,7 @@ export async function GET(request: NextRequest) {
   try {
     // 2. Fetch pending files (limit batch size)
     console.log(
-      "[/api/process-pending-uploads] Fetching pending files from DB..."
+      '[/api/process-pending-uploads] Fetching pending files from DB...'
     );
     const pendingFiles = await db
       .select()
@@ -439,8 +511,8 @@ export async function GET(request: NextRequest) {
       // Fetch 'pending' or 'processing' (in case a previous run timed out after marking as processing)
       .where(
         or(
-          eq(uploadedFiles.status, "pending"),
-          eq(uploadedFiles.status, "processing")
+          eq(uploadedFiles.status, 'pending'),
+          eq(uploadedFiles.status, 'processing')
         )
       )
       .limit(10); // Process up to 10 files per run
@@ -451,7 +523,7 @@ export async function GET(request: NextRequest) {
     );
     if (pendingFiles.length > 0) {
       console.log(
-        "[/api/process-pending-uploads] Pending file IDs and types:",
+        '[/api/process-pending-uploads] Pending file IDs and types:',
         pendingFiles.map((f) => ({
           id: f.id,
           status: f.status,
@@ -463,9 +535,9 @@ export async function GET(request: NextRequest) {
 
     if (pendingFiles.length === 0) {
       console.log(
-        "[/api/process-pending-uploads] No pending files to process."
+        '[/api/process-pending-uploads] No pending files to process.'
       );
-      return NextResponse.json({ message: "No pending files" });
+      return NextResponse.json({ message: 'No pending files' });
     }
 
     console.log(
@@ -480,10 +552,10 @@ export async function GET(request: NextRequest) {
       try {
         // Optimistically update status to processing *before* heavy lifting
         // This helps identify files that might timeout during processing
-        if (fileRecord.status !== "processing") {
+        if (fileRecord.status !== 'processing') {
           await db
             .update(uploadedFiles)
-            .set({ status: "processing", updatedAt: new Date(), error: null }) // Clear previous error on retry
+            .set({ status: 'processing', updatedAt: new Date(), error: null }) // Clear previous error on retry
             .where(eq(uploadedFiles.id, fileId));
           console.log(`Marked file ${fileId} as processing.`);
         } else {
@@ -513,7 +585,7 @@ export async function GET(request: NextRequest) {
         );
 
         // 5. Increment Token Usage (only on successful completion)
-        if (result.status === "completed" && result.tokensUsed > 0) {
+        if (result.status === 'completed' && result.tokensUsed > 0) {
           processedCount++;
           try {
             await incrementAndLogTokenUsage(userId, result.tokensUsed);
@@ -526,7 +598,7 @@ export async function GET(request: NextRequest) {
               tokenError
             );
           }
-        } else if (result.status === "error") {
+        } else if (result.status === 'error') {
           errorCount++;
         } else {
           // Successfully processed but used 0 tokens (e.g., empty extraction)
@@ -544,7 +616,7 @@ export async function GET(request: NextRequest) {
           await db
             .update(uploadedFiles)
             .set({
-              status: "error",
+              status: 'error',
               error: `Processing Loop Error: ${
                 dbUpdateError instanceof Error
                   ? dbUpdateError.message
@@ -566,10 +638,10 @@ export async function GET(request: NextRequest) {
       message: `Processing complete. Attempted: ${pendingFiles.length}, Succeeded: ${processedCount}, Errors: ${errorCount}`,
     });
   } catch (error: unknown) {
-    console.error("Error in background processing job:", error);
+    console.error('Error in background processing job:', error);
     return NextResponse.json(
       {
-        error: "Background processing job failed",
+        error: 'Background processing job failed',
         details: error instanceof Error ? error.message : String(error),
       },
       { status: 500 }
