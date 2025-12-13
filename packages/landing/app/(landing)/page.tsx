@@ -116,6 +116,7 @@ export default function Page() {
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
             className="w-full h-full"
+            suppressHydrationWarning
           ></iframe>
         </div>
       </div>
@@ -387,6 +388,7 @@ export default function Page() {
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
                 className="w-[100%] h-full"
+                suppressHydrationWarning
               ></iframe>
             </div>
             <div className="relative aspect-video rounded-lg overflow-hidden">
@@ -396,6 +398,7 @@ export default function Page() {
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                 allowFullScreen
                 className="w-full h-full"
+                suppressHydrationWarning
               ></iframe>
             </div>
           </div>

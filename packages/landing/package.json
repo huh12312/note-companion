@@ -36,7 +36,12 @@
     "react-circular-progressbar": "^2.1.0",
     "tailwind-merge": "^2.2.1",
     "tailwindcss-animate": "^1.0.7",
-    "zod": "catalog:"
+    "@tailwindcss/typography": "^0.5.10",
+    "zod": "catalog:",
+    "gray-matter": "^4.0.3",
+    "remark": "^15.0.1",
+    "remark-html": "^16.0.1",
+    "remark-gfm": "^4.0.0"
   },
   "devDependencies": {
     "@types/node": "^20",
