@@ -78,6 +78,9 @@ export const TranscriptionButton: React.FC<TranscriptionButtonProps> = ({
         return;
       }
 
+      let transcribedCount = 0;
+      let skippedCount = 0;
+
       for (const match of matches) {
         const audioFileName = match[1];
         const audioFile = plugin.app.metadataCache.getFirstLinkpathDest(
@@ -91,6 +94,14 @@ export const TranscriptionButton: React.FC<TranscriptionButtonProps> = ({
           continue;
         }
 
+        // Check if transcript already exists
+        if (plugin.hasExistingTranscript(content, audioFileName)) {
+          logger.info(`Transcript already exists for: ${audioFileName}`);
+          new Notice(`Transcript already exists for: ${audioFileName}`, 3000);
+          skippedCount++;
+          continue;
+        }
+
         const transcript = await plugin.generateTranscriptFromAudio(audioFile);
         await plugin.appendTranscriptToActiveFile(
           file,
@@ -98,9 +109,14 @@ export const TranscriptionButton: React.FC<TranscriptionButtonProps> = ({
           transcript
         );
         new Notice(`Transcript added for: ${audioFileName}`);
+        transcribedCount++;
       }
 
-      new Notice(`Completed transcribing ${matches.length} audio files`);
+      if (transcribedCount > 0) {
+        new Notice(`Completed transcribing ${transcribedCount} audio file(s)${skippedCount > 0 ? ` (${skippedCount} skipped)` : ''}`);
+      } else if (skippedCount > 0) {
+        new Notice(`All ${skippedCount} audio file(s) already have transcripts`);
+      }
     } catch (error) {
       logger.error("Error transcribing audio:", error);
       new Notice("Error transcribing audio");

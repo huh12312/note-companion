@@ -8,6 +8,49 @@ import { Unkey } from '@unkey/api';
 
 export const maxDuration = 800; // Maximum allowed for Vercel Pro plan (13.3 minutes) for longer audio/video files
 
+/**
+ * Formats transcript text by adding paragraph breaks at natural points
+ * to make it more readable.
+ *
+ * Breaks at:
+ * - Periods followed by capital letters (sentence boundaries)
+ * - Question marks and exclamation marks
+ * - Natural pauses (multiple spaces)
+ */
+function formatTranscript(text: string): string {
+  if (!text || text.trim().length === 0) {
+    return text;
+  }
+
+  // First, normalize multiple spaces to single spaces
+  let formatted = text.replace(/\s+/g, ' ').trim();
+
+  // Split into sentences by looking for sentence-ending punctuation
+  // followed by a space and a capital letter
+  const sentenceEndings = /([.!?])\s+([A-Z])/g;
+
+  // Replace sentence endings with punctuation + double newline + capital letter
+  formatted = formatted.replace(sentenceEndings, '$1\n\n$2');
+
+  // Also handle cases where sentence ends with punctuation followed by quotes
+  formatted = formatted.replace(/([.!?])\s*(["'])\s+([A-Z])/g, '$1$2\n\n$3');
+
+  // Handle question marks and exclamation marks similarly
+  formatted = formatted.replace(/([!?])\s+([A-Z])/g, '$1\n\n$2');
+
+  // Clean up any triple or more newlines (should only have double)
+  formatted = formatted.replace(/\n{3,}/g, '\n\n');
+
+  // Trim each paragraph
+  formatted = formatted
+    .split('\n\n')
+    .map(para => para.trim())
+    .filter(para => para.length > 0)
+    .join('\n\n');
+
+  return formatted;
+}
+
 export async function POST(request: Request) {
   let tempFilePath: string | null = null;
 
@@ -156,11 +199,14 @@ export async function POST(request: Request) {
       `[Transcribe] Transcription completed. Transcript length: ${transcriptLength} characters`
     );
 
+    // Format the transcript for better readability
+    const formattedText = formatTranscript(transcription.text);
+
     // Clean up temp file
     if (tempFilePath) await fsPromises.unlink(tempFilePath);
 
     return NextResponse.json({
-      text: transcription.text,
+      text: formattedText,
       length: transcriptLength, // Include length for debugging
     });
   } catch (error) {
@@ -246,11 +292,14 @@ async function handlePresignedUrlTranscription(
       `[Transcribe R2] Transcription completed. Transcript length: ${transcriptLength} characters`
     );
 
+    // Format the transcript for better readability
+    const formattedText = formatTranscript(transcription.text);
+
     // Clean up
     await fsPromises.unlink(tempFilePath);
 
     return NextResponse.json({
-      text: transcription.text,
+      text: formattedText,
       length: transcriptLength, // Include length for debugging
     });
   } catch (error) {

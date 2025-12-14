@@ -1262,11 +1262,47 @@ export default class FileOrganizer extends Plugin {
     this.addSettingTab(new FileOrganizerSettingTab(this.app, this));
   }
 
+  /**
+   * Checks if a transcript already exists in the note for the given audio file.
+   * Looks for the heading pattern: ## Transcript for [filename]
+   *
+   * @param fileContent - The content of the note file
+   * @param audioFileName - The name of the audio file (with or without extension)
+   * @returns true if transcript exists, false otherwise
+   */
+  hasExistingTranscript(fileContent: string, audioFileName: string): boolean {
+    // Normalize the filename - remove extension if present for matching
+    const nameWithoutExt = audioFileName.replace(
+      /\.(mp3|wav|m4a|ogg|webm)$/i,
+      ""
+    );
+    const nameWithExt = audioFileName;
+
+    // Check for both patterns: with and without extension
+    const transcriptHeader1 = `## Transcript for ${nameWithExt}`;
+    const transcriptHeader2 = `## Transcript for ${nameWithoutExt}`;
+
+    return (
+      fileContent.includes(transcriptHeader1) ||
+      fileContent.includes(transcriptHeader2)
+    );
+  }
+
   async appendTranscriptToActiveFile(
     parentFile: TFile,
     audioFileName: string,
     transcriptIterator: AsyncIterableIterator<string>
   ) {
+    // Check if transcript already exists before appending
+    const fileContent = await this.app.vault.read(parentFile);
+    if (this.hasExistingTranscript(fileContent, audioFileName)) {
+      new Notice(
+        `Transcript already exists for ${audioFileName}. Skipping transcription.`,
+        5000
+      );
+      return;
+    }
+
     const transcriptHeader = `\n\n## Transcript for ${audioFileName}\n\n`;
     await this.app.vault.append(parentFile, transcriptHeader);
 
@@ -1287,10 +1323,10 @@ export default class FileOrganizer extends Plugin {
     );
 
     // Verify by reading back the file
-    const fileContent = await this.app.vault.read(parentFile);
-    const transcriptStart = fileContent.indexOf(transcriptHeader);
+    const updatedFileContent = await this.app.vault.read(parentFile);
+    const transcriptStart = updatedFileContent.indexOf(transcriptHeader);
     if (transcriptStart !== -1) {
-      const appendedTranscript = fileContent.substring(
+      const appendedTranscript = updatedFileContent.substring(
         transcriptStart + transcriptHeader.length
       );
       console.log(
