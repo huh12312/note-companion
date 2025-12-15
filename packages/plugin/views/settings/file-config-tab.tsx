@@ -1,53 +1,73 @@
-import React, { useState, useEffect } from 'react';
-import FileOrganizer from '../../index';
-import { cleanPath } from '../../someUtils';
-import { normalizePath } from 'obsidian';
-import { Search } from 'lucide-react';
-import { logger } from '../../services/logger';
+import React, { useState, useEffect } from "react";
+import FileOrganizer from "../../index";
+import { cleanPath } from "../../someUtils";
+import { normalizePath } from "obsidian";
+import { Search, X } from "lucide-react";
+import { logger } from "../../services/logger";
 interface FileConfigTabProps {
   plugin: FileOrganizer;
 }
 
 export const FileConfigTab: React.FC<FileConfigTabProps> = ({ plugin }) => {
   const [pathToWatch, setPathToWatch] = useState(plugin.settings.pathToWatch);
-  const [attachmentsPath, setAttachmentsPath] = useState(plugin.settings.attachmentsPath);
-  const [logFolderPath, setLogFolderPath] = useState(plugin.settings.logFolderPath);
-  const [defaultDestinationPath, setDefaultDestinationPath] = useState(plugin.settings.defaultDestinationPath);
-  const [ignoreFolders, setIgnoreFolders] = useState(plugin.settings.ignoreFolders.join(','));
-  const [backupFolderPath, setBackupFolderPath] = useState(plugin.settings.backupFolderPath);
-  const [templatePaths, setTemplatePaths] = useState(plugin.settings.templatePaths);
-  const [bypassedFilePath, setBypassedFilePath] = useState(plugin.settings.bypassedFilePath);
-  const [errorFilePath, setErrorFilePath] = useState(plugin.settings.errorFilePath);
+  const [attachmentsPath, setAttachmentsPath] = useState(
+    plugin.settings.attachmentsPath
+  );
+  const [logFolderPath, setLogFolderPath] = useState(
+    plugin.settings.logFolderPath
+  );
+  const [defaultDestinationPath, setDefaultDestinationPath] = useState(
+    plugin.settings.defaultDestinationPath
+  );
+  const [ignoreFolders, setIgnoreFolders] = useState(
+    plugin.settings.ignoreFolders.join(",")
+  );
+  const [backupFolderPath, setBackupFolderPath] = useState(
+    plugin.settings.backupFolderPath
+  );
+  const [templatePaths, setTemplatePaths] = useState(
+    plugin.settings.templatePaths
+  );
+  const [bypassedFilePath, setBypassedFilePath] = useState(
+    plugin.settings.bypassedFilePath
+  );
+  const [errorFilePath, setErrorFilePath] = useState(
+    plugin.settings.errorFilePath
+  );
 
   const [warnings, setWarnings] = useState<Record<string, string>>({});
-  const [pathExistence, setPathExistence] = useState<Record<string, boolean>>({});
+  const [pathExistence, setPathExistence] = useState<Record<string, boolean>>(
+    {}
+  );
 
   const FolderList = React.memo(() => {
-    const [searchQuery, setSearchQuery] = useState('');
-    const [filterType, setFilterType] = useState<'all' | 'active' | 'ignored'>('active');
-    
-    const allFolders = plugin.app.vault.getAllFolders()
+    const [searchQuery, setSearchQuery] = useState("");
+    const [filterType, setFilterType] = useState<"all" | "active" | "ignored">(
+      "active"
+    );
+
+    const allFolders = plugin.app.vault.getAllFolders();
     const availableFolders = plugin.getAllUserFolders();
     const ignoredFolders = plugin.getAllIgnoredFolders();
 
     const getFilteredFolders = () => {
       let folders = availableFolders;
-      
+
       switch (filterType) {
-        case 'all':
+        case "all":
           folders = allFolders.map(folder => folder.path);
           break;
-        case 'active':
+        case "active":
           folders = availableFolders;
           break;
-        case 'ignored':
+        case "ignored":
           folders = ignoredFolders;
           break;
         default:
           folders = availableFolders;
       }
 
-      return folders.filter(folder => 
+      return folders.filter(folder =>
         folder.toLowerCase().includes(searchQuery.toLowerCase())
       );
     };
@@ -56,66 +76,100 @@ export const FileConfigTab: React.FC<FileConfigTabProps> = ({ plugin }) => {
 
     return (
       <div className="mb-8 p-4 bg-[--background-secondary] rounded-lg shadow-sm">
-
-        <div className="grid grid-cols-3 gap-4 mb-6">
-          <button
-            onClick={() => setFilterType('all')}
-            className={` cursor-pointer p-4 flex flex-col items-center justify-center py-10 bg-[--background-primary] rounded-lg border border-[--background-modifier-border] transition-colors ${
-              filterType === 'all' ? 'border-[--text-accent]' : ''
-            }`}
-          >
-            <div className="text-3xl font-semibold text-[--text-accent]">{allFolders.length}</div>
-            <div className="text-sm text-[--text-muted] mt-1">Total Folders</div>
-          </button>
-          <button
-            onClick={() => setFilterType('active')}
-            className={`cursor-pointer p-4 flex flex-col items-center justify-center py-10 bg-[--background-primary] rounded-lg border border-[--background-modifier-border] transition-colors ${
-              filterType === 'active' ? 'border-[--text-accent]' : ''
-            }`}
-          >
-            <div className="text-3xl font-semibold text-[--text-accent]">{availableFolders.length}</div>
-            <div className="text-sm text-[--text-muted] mt-1">Active Paths</div>
-          </button>
-          <button
-            onClick={() => setFilterType('ignored')}
-            className={`cursor-pointer p-4 flex flex-col items-center justify-center py-10 bg-[--background-primary] rounded-lg border border-[--background-modifier-border] transition-colors ${
-              filterType === 'ignored' ? 'border-[--text-accent]' : ''
-            }`}
-          >
-            <div className="text-3xl font-semibold text-[--text-accent]">{ignoredFolders.length}</div>
-            <div className="text-sm text-[--text-muted] mt-1">Ignored Paths</div>
-          </button>
-        </div>
-        
-        <div className="mb-2">
-          <p className="text-sm text-[--text-muted] mb-2">
+        <div className="mb-4">
+          <p className="text-sm text-[--text-muted] mb-3">
             Use the search box to verify folder accessibility
           </p>
-          <p className="text-sm text-[--text-accent]">
-            Currently showing: {filterType === 'all' ? 'all folders' : `${filterType} folders`}
-          </p>
+
+          {/* Tabs */}
+          <div className="flex border-b border-[--background-modifier-border]">
+            <button
+              onClick={() => setFilterType("all")}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                filterType === "all"
+                  ? "border-[--interactive-accent] text-[--text-accent]"
+                  : "border-transparent text-[--text-muted] hover:text-[--text-normal] hover:border-[--background-modifier-border]"
+              }`}
+            >
+              All Folders
+              <span
+                className={`ml-2 px-1.5 py-0.5 rounded text-xs ${
+                  filterType === "all"
+                    ? "bg-[--interactive-accent] text-[--text-on-accent]"
+                    : "bg-[--background-modifier-border] text-[--text-muted]"
+                }`}
+              >
+                {allFolders.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setFilterType("active")}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                filterType === "active"
+                  ? "border-[--interactive-accent] text-[--text-accent]"
+                  : "border-transparent text-[--text-muted] hover:text-[--text-normal] hover:border-[--background-modifier-border]"
+              }`}
+            >
+              Active Paths
+              <span
+                className={`ml-2 px-1.5 py-0.5 rounded text-xs ${
+                  filterType === "active"
+                    ? "bg-[--interactive-accent] text-[--text-on-accent]"
+                    : "bg-[--background-modifier-border] text-[--text-muted]"
+                }`}
+              >
+                {availableFolders.length}
+              </span>
+            </button>
+            <button
+              onClick={() => setFilterType("ignored")}
+              className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+                filterType === "ignored"
+                  ? "border-[--interactive-accent] text-[--text-accent]"
+                  : "border-transparent text-[--text-muted] hover:text-[--text-normal] hover:border-[--background-modifier-border]"
+              }`}
+            >
+              Ignored Paths
+              <span
+                className={`ml-2 px-1.5 py-0.5 rounded text-xs ${
+                  filterType === "ignored"
+                    ? "bg-[--interactive-accent] text-[--text-on-accent]"
+                    : "bg-[--background-modifier-border] text-[--text-muted]"
+                }`}
+              >
+                {ignoredFolders.length}
+              </span>
+            </button>
+          </div>
         </div>
 
-        <div className="relative mb-3">
-          <input
-            type="text"
-            placeholder="Search folders..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9 py-2 bg-[--background-primary] border border-[--background-modifier-border] rounded-md text-[--text-normal]"
-          />
-          <Search 
-            className="absolute left-3 top-1/2 -translate-y-1/2 text-[--text-muted] w-4 h-4" 
-          />
+        <div className="mb-3">
+          <div className="flex items-center gap-2 px-3 py-2 bg-[--background-modifier-form-field] border border-[--background-modifier-border] rounded-md focus-within:border-[--interactive-accent] focus-within:ring-1 focus-within:ring-[--interactive-accent]">
+            <Search className="w-4 h-4 text-[--text-muted] shrink-0" />
+            <input
+              type="text"
+              placeholder="Search folders..."
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              className="w-full bg-transparent border-0 p-0 text-[--text-normal] focus:outline-none"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery("")}
+                className="shrink-0 flex items-center justify-center p-1 text-[--text-muted] hover:text-[--text-normal] transition-colors cursor-pointer rounded hover:bg-[--background-modifier-hover]"
+                aria-label="Clear search"
+              >
+                <X className="w-4 h-4 stroke-current" />
+              </button>
+            )}
+          </div>
         </div>
 
-        <div 
-          className="max-h-[240px] overflow-y-auto border border-[--background-modifier-border] rounded-md bg-[--background-primary]"
-        >
+        <div className="max-h-[240px] overflow-y-auto border border-[--background-modifier-border] rounded-md bg-[--background-primary]">
           {filteredFolders.length > 0 ? (
             <div className="grid grid-cols-2 md:grid-cols-3 gap-0.5">
-              {filteredFolders.map((folder) => (
-                <div 
+              {filteredFolders.map(folder => (
+                <div
                   key={folder}
                   className="px-3 py-2 text-[--text-normal] text-sm hover:bg-[--background-modifier-hover] cursor-default truncate"
                   title={folder}
@@ -126,7 +180,9 @@ export const FileConfigTab: React.FC<FileConfigTabProps> = ({ plugin }) => {
             </div>
           ) : (
             <div className="p-4 text-center text-[--text-muted]">
-              {searchQuery ? 'No matching folders found' : 'No available folders'}
+              {searchQuery
+                ? "No matching folders found"
+                : "No available folders"}
             </div>
           )}
         </div>
@@ -187,47 +243,68 @@ export const FileConfigTab: React.FC<FileConfigTabProps> = ({ plugin }) => {
         backupFolderPath,
         templatePaths,
         bypassedFilePath,
-        errorFilePath
+        errorFilePath,
       ];
 
       const existenceResults = await Promise.all(
-        pathsToCheck.map(async (path) => [path, await checkPathExistence(path)])
+        pathsToCheck.map(async path => [path, await checkPathExistence(path)])
       );
 
       setPathExistence(Object.fromEntries(existenceResults));
     };
 
     checkPaths();
-  }, [pathToWatch, attachmentsPath, logFolderPath, defaultDestinationPath, backupFolderPath, templatePaths, bypassedFilePath, errorFilePath]);
+  }, [
+    pathToWatch,
+    attachmentsPath,
+    logFolderPath,
+    defaultDestinationPath,
+    backupFolderPath,
+    templatePaths,
+    bypassedFilePath,
+    errorFilePath,
+  ]);
 
   useEffect(() => {
     const newWarnings: Record<string, string> = {};
-    
+
     const checkPath = (path: string, key: string) => {
       if (path && cleanPath(path) !== path) {
-        newWarnings[key] = "Path may contain leading/trailing slashes or spaces. Consider cleaning it.";
+        newWarnings[key] =
+          "Path may contain leading/trailing slashes or spaces. Consider cleaning it.";
       }
     };
 
-    checkPath(pathToWatch, 'pathToWatch');
-    checkPath(attachmentsPath, 'attachmentsPath');
-    checkPath(logFolderPath, 'logFolderPath');
-    checkPath(defaultDestinationPath, 'defaultDestinationPath');
-    checkPath(backupFolderPath, 'backupFolderPath');
-    checkPath(templatePaths, 'templatePaths');
-    checkPath(bypassedFilePath, 'bypassedFilePath');
-    checkPath(errorFilePath, 'errorFilePath');
+    checkPath(pathToWatch, "pathToWatch");
+    checkPath(attachmentsPath, "attachmentsPath");
+    checkPath(logFolderPath, "logFolderPath");
+    checkPath(defaultDestinationPath, "defaultDestinationPath");
+    checkPath(backupFolderPath, "backupFolderPath");
+    checkPath(templatePaths, "templatePaths");
+    checkPath(bypassedFilePath, "bypassedFilePath");
+    checkPath(errorFilePath, "errorFilePath");
 
     // Special check for ignoreFolders
     if (ignoreFolders !== "*") {
-      const folders = ignoreFolders.split(',');
+      const folders = ignoreFolders.split(",");
       if (folders.some(folder => cleanPath(folder) !== folder.trim())) {
-        newWarnings['ignoreFolders'] = "Some folder paths may need cleaning. Consider removing spaces or slashes.";
+        newWarnings["ignoreFolders"] =
+          "Some folder paths may need cleaning. Consider removing spaces or slashes.";
       }
     }
 
     setWarnings(newWarnings);
-  }, [pathToWatch, attachmentsPath, logFolderPath, defaultDestinationPath, ignoreFolders, backupFolderPath, templatePaths, bypassedFilePath, errorFilePath]);
+  }, [
+    pathToWatch,
+    attachmentsPath,
+    logFolderPath,
+    defaultDestinationPath,
+    ignoreFolders,
+    backupFolderPath,
+    templatePaths,
+    bypassedFilePath,
+    errorFilePath,
+  ]);
 
   const renderSettingItem = (
     name: string,
@@ -241,12 +318,12 @@ export const FileConfigTab: React.FC<FileConfigTabProps> = ({ plugin }) => {
         <div className="setting-item-name">{name}</div>
         <div className="setting-item-description">{description}</div>
         {warnings[settingKey] && (
-          <div className="setting-item-warning" style={{ color: 'orange' }}>
+          <div className="setting-item-warning" style={{ color: "orange" }}>
             Warning: {warnings[settingKey]}
           </div>
         )}
         {pathExistence[value] === false && (
-          <div className="setting-item-error" style={{ color: 'red' }}>
+          <div className="setting-item-error" style={{ color: "red" }}>
             Path does not exist.
             <button
               onClick={async () => {
@@ -276,7 +353,8 @@ export const FileConfigTab: React.FC<FileConfigTabProps> = ({ plugin }) => {
     <div className="file-config-settings">
       <div className="mb-8">
         <p className="text-[--text-muted] mb-4">
-          Configure which folders File Organizer can manage and monitor. This helps you:
+          Configure which folders File Organizer can manage and monitor. This
+          helps you:
         </p>
         <ul className="list-disc pl-6 text-[--text-muted] space-y-1 mb-6">
           <li>Define which folders to watch for new files</li>
@@ -286,77 +364,116 @@ export const FileConfigTab: React.FC<FileConfigTabProps> = ({ plugin }) => {
         </ul>
         <div className="p-4 bg-[--background-primary-alt] rounded-lg border border-[--background-modifier-border]">
           <p className="text-sm text-[--text-accent]">
-            💡 Tip: Use the folder overview below to understand your vault structure and verify your path configurations.
+            💡 Tip: Use the folder overview below to understand your vault
+            structure and verify your path configurations.
           </p>
         </div>
       </div>
 
-      <FolderList key={Object.values(plugin.settings).join(',')} />
-      
+      <FolderList key={Object.values(plugin.settings).join(",")} />
+
       <div className="border-t border-[--background-modifier-border] ">
-        <h3 className="mb-4 text-lg font-medium text-[--text-normal]">Path Configuration</h3>
+        <h3 className="mb-4 text-lg font-medium text-[--text-normal]">
+          Path Configuration
+        </h3>
         {renderSettingItem(
           "Inbox folder",
           "Choose which folder to automatically organize files from",
           pathToWatch,
-          (e) => handleSettingChange(e.target.value, setPathToWatch, 'pathToWatch'),
-          'pathToWatch'
+          e =>
+            handleSettingChange(e.target.value, setPathToWatch, "pathToWatch"),
+          "pathToWatch"
         )}
         {renderSettingItem(
           "Attachments folder",
           "Enter the path to the folder where the original images will be moved.",
           attachmentsPath,
-          (e) => handleSettingChange(e.target.value, setAttachmentsPath, 'attachmentsPath'),
-          'attachmentsPath'
+          e =>
+            handleSettingChange(
+              e.target.value,
+              setAttachmentsPath,
+              "attachmentsPath"
+            ),
+          "attachmentsPath"
         )}
         {renderSettingItem(
           "File Organizer log folder",
           "Choose a folder for Organization Logs e.g. Ava/Logs.",
           logFolderPath,
-          (e) => handleSettingChange(e.target.value, setLogFolderPath, 'logFolderPath'),
-          'logFolderPath'
+          e =>
+            handleSettingChange(
+              e.target.value,
+              setLogFolderPath,
+              "logFolderPath"
+            ),
+          "logFolderPath"
         )}
         {renderSettingItem(
           "Output folder path",
           "Enter the path where you want to save the processed files. e.g. Processed/myfavoritefolder",
           defaultDestinationPath,
-          (e) => handleSettingChange(e.target.value, setDefaultDestinationPath, 'defaultDestinationPath'),
-          'defaultDestinationPath'
+          e =>
+            handleSettingChange(
+              e.target.value,
+              setDefaultDestinationPath,
+              "defaultDestinationPath"
+            ),
+          "defaultDestinationPath"
         )}
         {renderSettingItem(
           "Ignore folders",
           "Enter folder paths to ignore during organization, separated by commas(e.g. Folder1,Folder2). Or * to ignore all folders",
           ignoreFolders,
-          (e) => handleIgnoreFoldersChange(e.target.value),
-          'ignoreFolders'
+          e => handleIgnoreFoldersChange(e.target.value),
+          "ignoreFolders"
         )}
         {renderSettingItem(
           "Backup folder",
           "Choose a folder for file backups.",
           backupFolderPath,
-          (e) => handleSettingChange(e.target.value, setBackupFolderPath, 'backupFolderPath'),
-          'backupFolderPath'
+          e =>
+            handleSettingChange(
+              e.target.value,
+              setBackupFolderPath,
+              "backupFolderPath"
+            ),
+          "backupFolderPath"
         )}
         {renderSettingItem(
           "Templates folder",
           "Choose a folder for document templates.",
           templatePaths,
-          (e) => handleSettingChange(e.target.value, setTemplatePaths, 'templatePaths'),
-          'templatePaths'
+          e =>
+            handleSettingChange(
+              e.target.value,
+              setTemplatePaths,
+              "templatePaths"
+            ),
+          "templatePaths"
         )}
         {renderSettingItem(
           "Bypassed notes path",
           "Choose a folder for bypassed notes.",
           bypassedFilePath,
-          (e) => handleSettingChange(e.target.value, setBypassedFilePath, 'bypassedFilePath'),
-          'bypassedFilePath'
+          e =>
+            handleSettingChange(
+              e.target.value,
+              setBypassedFilePath,
+              "bypassedFilePath"
+            ),
+          "bypassedFilePath"
         )}
         {renderSettingItem(
           "Error notes path",
           "Choose a folder for error notes.",
           errorFilePath,
-          (e) => handleSettingChange(e.target.value, setErrorFilePath, 'errorFilePath'),
-          'errorFilePath'
+          e =>
+            handleSettingChange(
+              e.target.value,
+              setErrorFilePath,
+              "errorFilePath"
+            ),
+          "errorFilePath"
         )}
       </div>
     </div>
