@@ -11,7 +11,7 @@
   flex-direction: column !important;
 }
 
-/* 
+/*
  * Style isolation for all plugin components using fo- prefix
  */
 .fo-container {
@@ -48,16 +48,16 @@
 }
 
 /* Reset margins and paddings for common elements */
-.sync-tab-container h1, 
-.sync-tab-container h2, 
-.sync-tab-container h3, 
-.sync-tab-container h4, 
-.sync-tab-container h5, 
+.sync-tab-container h1,
+.sync-tab-container h2,
+.sync-tab-container h3,
+.sync-tab-container h4,
+.sync-tab-container h5,
 .sync-tab-container h6,
-.sync-tab-container p, 
-.sync-tab-container ul, 
+.sync-tab-container p,
+.sync-tab-container ul,
 .sync-tab-container ol,
-.sync-tab-container li, 
+.sync-tab-container li,
 .sync-tab-container blockquote {
   margin: 0;
   padding: 0;
@@ -351,6 +351,15 @@
   margin: 0;
   word-wrap: break-word;
   overflow-wrap: break-word;
+}
+
+/* Tiptap Placeholder Styles */
+.tiptap-editor .tiptap p.is-editor-empty:first-child::before {
+  color: var(--text-muted);
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
 }
 
 /* Spinner Styles */

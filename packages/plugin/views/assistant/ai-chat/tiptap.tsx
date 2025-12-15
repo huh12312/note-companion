@@ -29,10 +29,12 @@ interface MentionNodeAttrs {
 const Tiptap: React.FC<TiptapProps> = ({ value, onChange, onKeyDown }) => {
   const plugin = usePlugin();
   const { files, folders, tags, loadFileContent } = useVaultItems();
+  const [isEmpty, setIsEmpty] = React.useState(!value || value.trim() === "");
 
   const handleUpdate = useCallback(
     ({ editor }: { editor: any }) => {
       const content = editor.getText();
+      setIsEmpty(!content || content.trim() === "");
       onChange(content);
     },
     [onChange]
@@ -76,7 +78,7 @@ const Tiptap: React.FC<TiptapProps> = ({ value, onChange, onKeyDown }) => {
           path: props.path,
           title: props.title,
           content: props.content,
-          });
+        });
         break;
 
       case "tag":
@@ -112,6 +114,7 @@ const Tiptap: React.FC<TiptapProps> = ({ value, onChange, onKeyDown }) => {
       attributes: {
         class:
           "prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none",
+        "data-placeholder": "Type @ to mention files, folders, or tags...",
       },
     },
   });
@@ -131,12 +134,36 @@ const Tiptap: React.FC<TiptapProps> = ({ value, onChange, onKeyDown }) => {
   useEffect(() => {
     if (editor && editor.getText() !== value) {
       editor.commands.setContent(value);
+      setIsEmpty(!value || value.trim() === "");
     }
   }, [value, editor]);
 
+  // Update isEmpty when editor content changes
+  useEffect(() => {
+    if (editor) {
+      const updateIsEmpty = () => {
+        const content = editor.getText();
+        setIsEmpty(!content || content.trim() === "");
+      };
+
+      editor.on("update", updateIsEmpty);
+      editor.on("selectionUpdate", updateIsEmpty);
+
+      return () => {
+        editor.off("update", updateIsEmpty);
+        editor.off("selectionUpdate", updateIsEmpty);
+      };
+    }
+  }, [editor]);
+
   return (
-    <div className="tiptap-editor" onKeyDown={onKeyDown}>
+    <div className="tiptap-editor relative" onKeyDown={onKeyDown}>
       <EditorContent editor={editor} />
+      {isEmpty && editor && (
+        <div className="absolute left-[10px] top-[10px] pointer-events-none text-[--text-muted] text-sm select-none">
+          Type @ to mention files, folders, or tags...
+        </div>
+      )}
     </div>
   );
 };
