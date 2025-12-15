@@ -19,7 +19,7 @@ const LicenseForm = () => {
   const [licenseKey, setLicenseKey] = useState<string>("");
   const [isPaid, setIsPaid] = useState(false);
   const [loading, setLoading] = useState(false);
-  
+
   const { user } = useUser();
 
   const handleCreateKey = async () => {
@@ -32,11 +32,15 @@ const LicenseForm = () => {
         alert(res.error);
         return;
       }
-      if (res) {
-        setLicenseKey(res.key?.key ?? "");
+      if (res?.key?.key) {
+        setLicenseKey(res.key.key);
+      } else {
+        alert('Failed to create license key. Please try again or contact support.');
+        console.error('Unexpected response format:', res);
       }
     } catch (error) {
-      console.error(error);
+      console.error('Error creating license key:', error);
+      alert(`Error creating license key: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setLoading(false);
     }
