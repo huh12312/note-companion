@@ -36,14 +36,13 @@ export async function createLicenseKeyFromUserId(userId: string) {
 
   console.log('Creating Unkey license key', {
     apiId,
-    ownerId: userId,
+    externalId: userId,
     name,
   });
-  // Unkey v2 SDK - keys.create method
-  // Type assertion needed as v2 types may differ
-  const response = await (unkey as any).keys.create({
+  // Unkey v2 SDK - keys.createKey method
+  const response = await unkey.keys.createKey({
     name: name,
-    ownerId: userId,
+    externalId: userId,
     apiId,
   });
 
@@ -52,22 +51,16 @@ export async function createLicenseKeyFromUserId(userId: string) {
     hasResponse: !!response,
     responseKeys: response ? Object.keys(response) : [],
     hasData: response ? 'data' in response : false,
-    hasResult: response ? 'result' in response : false,
-    hasError: response ? 'error' in response : false,
-    error: response?.error,
     fullResponse: JSON.stringify(response, null, 2),
   });
 
-  // Handle v2 response format (wrapped in data) or v1 format (direct result)
-  // Unkey can return: { data: { key: "...", keyId: "..." } } (v2) or { key: "...", keyId: "..." } (v1)
-  const keyResult =
-    response && ('data' in response ? response.data : response.result || response);
+  // Unkey v2 response format: { data: { key: "...", keyId: "..." } }
+  const keyResult = response?.data;
 
-  if (response.error || !keyResult) {
+  if (!keyResult) {
     console.error('Failed to create license key', {
-      error: response.error,
       hasKeyResult: !!keyResult,
-      keyResult,
+      response,
     });
     return null;
   }
