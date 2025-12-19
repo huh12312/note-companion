@@ -3,6 +3,7 @@ import StarterKit from "@tiptap/starter-kit";
 import React, { useEffect, useCallback } from "react";
 import { Mention } from "@tiptap/extension-mention";
 import suggestion from "./suggestion";
+import SlashCommand from "./slash-command";
 import {
   addFileContext,
   addTagContext,
@@ -15,6 +16,7 @@ interface TiptapProps {
   value: string;
   onChange: (value: string) => void;
   onKeyDown?: (event: React.KeyboardEvent) => void;
+  editorRef?: React.RefObject<Editor | null>;
 }
 
 interface MentionNodeAttrs {
@@ -26,7 +28,12 @@ interface MentionNodeAttrs {
   path?: string;
 }
 
-const Tiptap: React.FC<TiptapProps> = ({ value, onChange, onKeyDown }) => {
+const Tiptap: React.FC<TiptapProps> = ({
+  value,
+  onChange,
+  onKeyDown,
+  editorRef,
+}) => {
   const plugin = usePlugin();
   const { files, folders, tags, loadFileContent } = useVaultItems();
   const [isEmpty, setIsEmpty] = React.useState(!value || value.trim() === "");
@@ -107,6 +114,11 @@ const Tiptap: React.FC<TiptapProps> = ({ value, onChange, onKeyDown }) => {
           command: handleMentionCommand,
         },
       }),
+      SlashCommand.configure({
+        HTMLAttributes: {
+          class: "slash-command",
+        },
+      }),
     ],
     content: value,
     onUpdate: handleUpdate,
@@ -114,7 +126,8 @@ const Tiptap: React.FC<TiptapProps> = ({ value, onChange, onKeyDown }) => {
       attributes: {
         class:
           "prose prose-sm sm:prose lg:prose-lg xl:prose-2xl mx-auto focus:outline-none",
-        "data-placeholder": "Type @ to mention files, folders, or tags...",
+        "data-placeholder":
+          "Type @ to mention files, folders, or tags, or / for commands...",
       },
     },
   });
@@ -130,6 +143,23 @@ const Tiptap: React.FC<TiptapProps> = ({ value, onChange, onKeyDown }) => {
     }
   }, [editor, files, folders, tags]);
 
+  // Load template names and store in editor storage
+  useEffect(() => {
+    const loadTemplates = async () => {
+      if (editor && plugin) {
+        try {
+          const templateNames = await plugin.getTemplateNames();
+          editor.storage.templates = templateNames;
+        } catch (error) {
+          console.error("Error loading template names:", error);
+          editor.storage.templates = [];
+        }
+      }
+    };
+
+    loadTemplates();
+  }, [editor, plugin]);
+
   // Sync editor content with value prop
   useEffect(() => {
     if (editor && editor.getText() !== value) {
@@ -137,6 +167,13 @@ const Tiptap: React.FC<TiptapProps> = ({ value, onChange, onKeyDown }) => {
       setIsEmpty(!value || value.trim() === "");
     }
   }, [value, editor]);
+
+  // Expose editor via ref
+  useEffect(() => {
+    if (editor && editorRef) {
+      (editorRef as React.MutableRefObject<Editor | null>).current = editor;
+    }
+  }, [editor, editorRef]);
 
   // Update isEmpty when editor content changes
   useEffect(() => {
@@ -161,7 +198,7 @@ const Tiptap: React.FC<TiptapProps> = ({ value, onChange, onKeyDown }) => {
       <EditorContent editor={editor} />
       {isEmpty && editor && (
         <div className="absolute left-[10px] top-[10px] pointer-events-none text-[--text-muted] text-sm select-none">
-          Type @ to mention files, folders, or tags...
+          Type @ to mention files, folders, or tags, or / for commands...
         </div>
       )}
     </div>

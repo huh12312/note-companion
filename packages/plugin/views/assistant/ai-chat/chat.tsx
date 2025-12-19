@@ -6,10 +6,11 @@ import React, {
   useMemo,
 } from "react";
 import { useChat, UseChatOptions } from "@ai-sdk/react";
-import { moment } from "obsidian";
+import { moment, Notice } from "obsidian";
 import { Button } from "@/components/ui/button";
 import { RefreshCw, AlertCircle, Send, Square } from "lucide-react";
 import { StyledContainer } from "@/components/ui/utils";
+import { Editor } from "@tiptap/react";
 
 import FileOrganizer from "../../..";
 import { GroundingMetadata, DataChunk } from "./types/grounding";
@@ -82,8 +83,11 @@ export const ChatComponent: React.FC<ChatComponentProps> = ({
 
   // Track editor selection for contextual understanding
   // Uses frozen context to preserve selection even when chat input gets focus
-  const { current: currentEditorContext, frozen: frozenEditorContext } =
-    useEditorSelection(app);
+  const {
+    current: currentEditorContext,
+    frozen: frozenEditorContext,
+    clearFrozen,
+  } = useEditorSelection(app);
 
   const editorContext = frozenEditorContext;
 
@@ -567,6 +571,173 @@ export const ChatComponent: React.FC<ChatComponentProps> = ({
     setErrorMessage(null);
   };
 
+  // Ref to access Tiptap editor
+  const tiptapEditorRef = useRef<Editor | null>(null);
+
+  // Handle slash command actions
+  useEffect(() => {
+    const handleSlashCommand = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      const { action, item } = customEvent.detail;
+      const editor = tiptapEditorRef.current;
+
+      console.log("Slash command received:", action, item);
+
+      switch (action) {
+        case "format": {
+          // Handle format command - trigger actual formatting like organizer does
+          const { templateName } = customEvent.detail;
+          if (!templateName) {
+            console.warn("Format command missing templateName");
+            break;
+          }
+
+          // Get current file from editor context or active file
+          const activeFile = app.workspace.getActiveFile();
+          if (!activeFile) {
+            new Notice(
+              "No file is currently open. Please open a file to format.",
+              4000
+            );
+            break;
+          }
+
+          // Add user message to chat showing the format request
+          setMessages([
+            ...messages,
+            {
+              id: `format-${Date.now()}`,
+              role: "user",
+              content: `Format as ${templateName}`,
+            },
+          ]);
+
+          // Execute formatting asynchronously
+          (async () => {
+            try {
+              let fileContent = await app.vault.read(activeFile);
+              if (typeof fileContent !== "string") {
+                throw new Error("File content is not a string");
+              }
+
+              // Handle YouTube video special case
+              if (
+                templateName === "youtube_video" ||
+                templateName === "youtube_video.md"
+              ) {
+                const { extractYouTubeVideoId, getYouTubeContent } =
+                  await import("../../../inbox/services/youtube-service");
+                const videoId = extractYouTubeVideoId(fileContent);
+                if (videoId) {
+                  try {
+                    new Notice("Fetching YouTube transcript...", 2000);
+                    const { title, transcript } = await getYouTubeContent(
+                      videoId,
+                      plugin
+                    );
+                    const videoInfo = `\n\n## YouTube Video Information\n\nTitle: ${title}\nVideo ID: ${videoId}\n\n## Full Transcript\n\n${transcript}`;
+                    fileContent = fileContent + videoInfo;
+                    new Notice("Transcript fetched, formatting...", 2000);
+                  } catch (error) {
+                    logger.warn(
+                      "Failed to fetch YouTube transcript, formatting without it:",
+                      error
+                    );
+                    new Notice(
+                      `Could not fetch transcript: ${
+                        error instanceof Error ? error.message : String(error)
+                      }. Formatting with available content.`,
+                      5000
+                    );
+                  }
+                }
+              }
+
+              // Get template instructions and format
+              const formattingInstruction =
+                await plugin.getTemplateInstructions(templateName);
+              await plugin.streamFormatInCurrentNote({
+                file: activeFile,
+                content: fileContent,
+                formattingInstruction: formattingInstruction,
+              });
+            } catch (error) {
+              logger.error("Error formatting file:", error);
+              new Notice(
+                `Error formatting file: ${
+                  error instanceof Error ? error.message : String(error)
+                }`,
+                6000
+              );
+            }
+          })();
+          break;
+        }
+        case "clear":
+          handleNewChat();
+          if (editor) {
+            editor.commands.clearContent();
+          }
+          break;
+        case "newChat":
+          handleNewChat();
+          if (editor) {
+            editor.commands.clearContent();
+          }
+          break;
+        case "search":
+          // Insert search prompt into editor
+          if (editor) {
+            editor.chain().focus().insertContent("Search my vault for: ").run();
+          } else {
+            handleInputChange({
+              target: { value: "Search my vault for: " },
+            } as React.ChangeEvent<HTMLInputElement>);
+          }
+          break;
+        case "summarize":
+          if (editor) {
+            editor
+              .chain()
+              .focus()
+              .insertContent("Summarize the current context")
+              .run();
+          } else {
+            handleInputChange({
+              target: { value: "Summarize the current context" },
+            } as React.ChangeEvent<HTMLInputElement>);
+          }
+          break;
+        case "explain":
+          if (editor) {
+            editor.chain().focus().insertContent("Explain: ").run();
+          } else {
+            handleInputChange({
+              target: { value: "Explain: " },
+            } as React.ChangeEvent<HTMLInputElement>);
+          }
+          break;
+        default:
+          console.warn("Unknown slash command action:", action);
+          break;
+      }
+    };
+
+    document.addEventListener("slashCommand", handleSlashCommand);
+
+    return () => {
+      document.removeEventListener("slashCommand", handleSlashCommand);
+    };
+  }, [
+    input,
+    handleNewChat,
+    handleInputChange,
+    messages,
+    setMessages,
+    app,
+    plugin,
+  ]);
+
   return (
     <StyledContainer className="flex flex-col h-full w-full max-h-full overflow-hidden">
       {/* Chat Header - minimal */}
@@ -694,11 +865,12 @@ export const ChatComponent: React.FC<ChatComponentProps> = ({
           {/* Row 2: Input area with embedded send button */}
           <div className="relative" ref={inputRef}>
             {/* Show editor context badge if we have selection */}
-            <EditorContextBadge context={editorContext} />
+            <EditorContextBadge context={editorContext} onClear={clearFrozen} />
             <Tiptap
               value={input}
               onChange={handleTiptapChange}
               onKeyDown={handleKeyDown}
+              editorRef={tiptapEditorRef}
             />
             {/* Embedded controls - bottom right corner of input */}
             <div className="absolute bottom-2 right-2 flex items-center gap-1">
