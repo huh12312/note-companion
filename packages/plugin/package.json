@@ -1,6 +1,6 @@
 {
   "name": "@file-organizer/plugin",
-  "version": "3.2.5",
+  "version": "3.3.0",
   "description": "Note Companion",
   "main": "main.js",
   "scripts": {
