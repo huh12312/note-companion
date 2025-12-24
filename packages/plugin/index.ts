@@ -662,37 +662,57 @@ export default class FileOrganizer extends Plugin {
     const fileName = `audio-${Date.now()}.${fileExtension}`;
     const mimeType = `audio/${fileExtension}`;
 
-    // Use proxy endpoint to upload to R2 server-side (avoids CORS issues in Electron)
-    // Step 1: Upload audio file to backend, which uploads to R2
-    // Include extension in URL query parameter to avoid CORS header issues
-    const uploadResponse = await fetch(
-      `${this.getServerUrl()}/api/upload-audio-to-r2?extension=${fileExtension}`,
+    // Step 1: Get presigned URL from backend (small JSON request, bypasses Vercel body size limit)
+    const presignedUrlResponse = await fetch(
+      `${this.getServerUrl()}/api/create-upload-url`,
       {
         method: "POST",
         headers: {
-          "Content-Type": mimeType,
+          "Content-Type": "application/json",
           Authorization: `Bearer ${this.settings.API_KEY}`,
         },
-        body: audioBuffer,
+        body: JSON.stringify({
+          filename: fileName,
+          contentType: mimeType,
+        }),
       }
     );
 
-    if (!uploadResponse.ok) {
-      const errorData = await uploadResponse.json();
+    if (!presignedUrlResponse.ok) {
+      const errorData = await presignedUrlResponse.json();
       throw new Error(
-        `Failed to upload audio to R2: ${
+        `Failed to get presigned URL: ${
           errorData.error || errorData.details || "Unknown error"
         }`
       );
     }
 
-    const { key, publicUrl } = await uploadResponse.json();
+    const { uploadUrl, key, publicUrl } = await presignedUrlResponse.json();
 
-    if (!key || !publicUrl) {
-      throw new Error("Invalid response from upload-audio-to-r2 endpoint");
+    if (!uploadUrl || !key || !publicUrl) {
+      throw new Error("Invalid response from create-upload-url endpoint");
     }
 
-    // Step 2: Trigger transcription with the uploaded file URL
+    // Step 2: Upload directly to R2 using presigned URL (bypasses Vercel completely)
+    // This avoids Vercel's 4.5MB body size limit
+    // CORS is configured on R2 bucket, so we can use fetch with ArrayBuffer directly
+    // This ensures binary data integrity without any string conversion
+    const uploadResponse = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": mimeType,
+        // DO NOT include Authorization header - presigned URL handles auth
+      },
+      body: audioBuffer, // Send ArrayBuffer directly - no conversion needed
+    });
+
+    if (!uploadResponse.ok) {
+      throw new Error(
+        `Failed to upload audio to R2: ${uploadResponse.status} ${uploadResponse.statusText}`
+      );
+    }
+
+    // Step 3: Trigger transcription with the uploaded file URL
     const transcribeResponse = await fetch(
       `${this.getServerUrl()}/api/transcribe`,
       {
