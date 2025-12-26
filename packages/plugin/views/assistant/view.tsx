@@ -12,6 +12,8 @@ import { SyncTab } from "./synchronizer/sync-tab";
 import { StyledContainer } from "../../components/ui/utils";
 import { tw } from "../../lib/utils";
 import { Sparkles, Inbox, MessageSquare, Cloud } from "lucide-react";
+import { UpgradeButton } from "../../components/upgrade-button";
+import { UsageData } from "../..";
 
 export const ORGANIZER_VIEW_TYPE = "fo2k.assistant.sidebar2";
 
@@ -22,11 +24,13 @@ function TabContent({
   plugin,
   leaf,
   showSyncTab,
+  onTokenLimitError,
 }: {
   activeTab: Tab;
   plugin: FileOrganizer;
   leaf: WorkspaceLeaf;
   showSyncTab: boolean;
+  onTokenLimitError?: (error: string) => void;
 }) {
   const [activeFile, setActiveFile] = React.useState<TFile | null>(null);
   const [noteContent, setNoteContent] = React.useState<string>("");
@@ -101,7 +105,7 @@ function TabContent({
             activeTab === "sync" ? "block" : "hidden"
           )}
         >
-          <SyncTab plugin={plugin} />
+          <SyncTab plugin={plugin} onTokenLimitError={onTokenLimitError} />
         </div>
       )}
     </div>
@@ -155,10 +159,65 @@ function AssistantContent({
   onTabChange: (setTab: (tab: Tab) => void) => void;
 }) {
   const [activeTab, setActiveTab] = React.useState<Tab>(initialTab);
+  const [usageData, setUsageData] = React.useState<UsageData | null>(null);
+  const [forceShowUpgrade, setForceShowUpgrade] = React.useState(false);
 
   React.useEffect(() => {
     onTabChange(setActiveTab);
   }, [onTabChange]);
+
+  // Fetch usage data on mount
+  React.useEffect(() => {
+    const fetchUsage = async () => {
+      try {
+        const data = await plugin.fetchUsageStats();
+        if (data) {
+          setUsageData(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch usage data:", error);
+      }
+    };
+
+    if (plugin.settings.API_KEY) {
+      fetchUsage();
+    }
+  }, [plugin]);
+
+  // Helper function to check if upgrade button should be shown
+  const shouldShowUpgradeButton = () => {
+    // Force show if token limit error occurred
+    if (forceShowUpgrade) return true;
+
+    if (!usageData) return false;
+
+    const isFreeTier =
+      usageData.currentPlan === "Legacy Plan" ||
+      usageData.currentPlan === "Free" ||
+      usageData.maxTokenUsage === 100000;
+
+    if (!isFreeTier) return false;
+
+    const usagePercent = usageData.tokenUsage / usageData.maxTokenUsage;
+    return usagePercent >= 0.8; // 80% threshold
+  };
+
+  // Handle token limit errors from child components
+  const handleTokenLimitError = React.useCallback(
+    (error: string) => {
+      setForceShowUpgrade(true);
+      // Refresh usage data
+      plugin
+        .fetchUsageStats()
+        .then(data => {
+          if (data) {
+            setUsageData(data);
+          }
+        })
+        .catch(console.error);
+    },
+    [plugin]
+  );
 
   const showSyncTab = plugin.settings.showSyncTab;
 
@@ -167,38 +226,53 @@ function AssistantContent({
       {/* Native tab navigation */}
       <div
         className={tw(
-          "flex gap-0 px-3 pt-2 pb-0 border-b border-[--background-modifier-border] bg-[--background-primary]"
+          "flex gap-0 px-3 pt-2 pb-0 border-b border-[--background-modifier-border] bg-[--background-primary] items-center justify-between"
         )}
       >
-        <TabButton
-          isActive={activeTab === "organizer"}
-          onClick={() => setActiveTab("organizer")}
-          icon={<Sparkles className="w-4 h-4" />}
-        >
-          Organizer
-        </TabButton>
-        <TabButton
-          isActive={activeTab === "inbox"}
-          onClick={() => setActiveTab("inbox")}
-          icon={<Inbox className="w-4 h-4" />}
-        >
-          Inbox
-        </TabButton>
-        <TabButton
-          isActive={activeTab === "chat"}
-          onClick={() => setActiveTab("chat")}
-          icon={<MessageSquare className="w-4 h-4" />}
-        >
-          Chat
-        </TabButton>
-        {showSyncTab && (
+        <div className={tw("flex gap-0")}>
           <TabButton
-            isActive={activeTab === "sync"}
-            onClick={() => setActiveTab("sync")}
-            icon={<Cloud className="w-4 h-4" />}
+            isActive={activeTab === "organizer"}
+            onClick={() => setActiveTab("organizer")}
+            icon={<Sparkles className="w-4 h-4" />}
           >
-            Sync
+            Organizer
           </TabButton>
+          <TabButton
+            isActive={activeTab === "inbox"}
+            onClick={() => setActiveTab("inbox")}
+            icon={<Inbox className="w-4 h-4" />}
+          >
+            Inbox
+          </TabButton>
+          <TabButton
+            isActive={activeTab === "chat"}
+            onClick={() => setActiveTab("chat")}
+            icon={<MessageSquare className="w-4 h-4" />}
+          >
+            Chat
+          </TabButton>
+          {showSyncTab && (
+            <TabButton
+              isActive={activeTab === "sync"}
+              onClick={() => setActiveTab("sync")}
+              icon={<Cloud className="w-4 h-4" />}
+            >
+              Sync
+            </TabButton>
+          )}
+        </div>
+
+        {/* Upgrade button - visible when free tier user is at 80%+ usage or token limit error occurred */}
+        {shouldShowUpgradeButton() && (
+          <div className={tw("ml-auto")}>
+            <UpgradeButton
+              plugin={plugin}
+              variant="compact"
+              showMessage={true}
+              usageData={usageData}
+              isForced={forceShowUpgrade}
+            />
+          </div>
         )}
       </div>
 
@@ -209,6 +283,7 @@ function AssistantContent({
           plugin={plugin}
           leaf={leaf}
           showSyncTab={showSyncTab}
+          onTokenLimitError={handleTokenLimitError}
         />
       </div>
     </div>

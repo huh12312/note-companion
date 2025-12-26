@@ -57,7 +57,13 @@ interface PaginatedResponse {
   };
 }
 
-export function SyncTab({ plugin }: { plugin: FileOrganizer }) {
+export function SyncTab({
+  plugin,
+  onTokenLimitError,
+}: {
+  plugin: FileOrganizer;
+  onTokenLimitError?: (error: string) => void;
+}) {
   const [files, setFiles] = useState<RemoteFile[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -102,64 +108,95 @@ export function SyncTab({ plugin }: { plugin: FileOrganizer }) {
       setLoading(true);
       setError(null);
 
-      const response = await makeApiRequest<PaginatedResponse>(() =>
-        requestUrl({
-          url: `${plugin.getServerUrl()}/api/files?page=${page}`,
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${plugin.settings.API_KEY}`,
-          },
-        })
-      );
+      // Make the request directly to check status code
+      const urlResponse = await requestUrl({
+        url: `${plugin.getServerUrl()}/api/files?page=${page}`,
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${plugin.settings.API_KEY}`,
+        },
+      });
 
-      setFiles(response.files);
-      setTotalPages(response.pagination.totalPages);
-      setLoading(false);
-      
-      // After loading files, fetch previews for any binary files
-      for (const file of response.files) {
-        if (file.status === "completed" && 
-            (file.fileType.startsWith('image/') || file.fileType === 'application/pdf')) {
-          fetchPreview(file);
-        }
+      // Check for 429 status (token limit exceeded)
+      if (urlResponse.status === 429) {
+        const errorData = urlResponse.json as { error?: string };
+        const errorMessage =
+          errorData?.error ||
+          "Token limit exceeded. Please upgrade your plan for more tokens.";
+        setError(errorMessage);
+        setLoading(false);
+        // Notify parent component to show upgrade button
+        onTokenLimitError?.(errorMessage);
+        return;
       }
+
+      // For successful responses, parse the JSON
+      if (urlResponse.status >= 200 && urlResponse.status < 300) {
+        const response = urlResponse.json as PaginatedResponse;
+        setFiles(response.files);
+        setTotalPages(response.pagination.totalPages);
+        setLoading(false);
+
+        // After loading files, fetch previews for any binary files
+        for (const file of response.files) {
+          if (file.status === "completed" &&
+              (file.fileType.startsWith('image/') || file.fileType === 'application/pdf')) {
+            fetchPreview(file);
+          }
+        }
+        return;
+      }
+
+      // Handle other error statuses
+      const errorData = urlResponse.json as { error?: string };
+      throw new Error(errorData?.error || `Request failed with status ${urlResponse.status}`);
     } catch (err) {
-      setError(
-        "Failed to fetch files: " +
-          (err instanceof Error ? err.message : String(err))
-      );
+      // Check if error message contains token limit information
+      const errorMessage =
+        err instanceof Error ? err.message : String(err);
+
+      if (
+        errorMessage.includes("Token limit exceeded") ||
+        errorMessage.includes("token limit") ||
+        errorMessage.includes("429")
+      ) {
+        setError("Token limit exceeded. Please upgrade your plan for more tokens.");
+        onTokenLimitError?.("Token limit exceeded");
+      } else {
+        setError("Failed to fetch files: " + errorMessage);
+      }
       setLoading(false);
     }
   }
-  
+
   // Fetch preview for binary files (images and PDFs)
   const fetchPreview = async (file: RemoteFile) => {
     // Skip if not a previewable file or already in cache
     if (previewCache[file.id] || file.status !== "completed") {
       return;
     }
-    
+
     // Only load previews for images and PDFs
     const isImage = file.fileType.startsWith('image/');
     const isPDF = file.fileType === 'application/pdf';
-    
+
     if (!isImage && !isPDF) {
       return;
     }
-    
+
     // Set loading state
     setLoadingPreviews(prev => ({ ...prev, [file.id]: true }));
-    
+
     try {
       // Fetch the binary file
       const response = await requestUrl({
         url: file.blobUrl,
         method: "GET"
       });
-      
+
       // Convert to data URL
       let dataUrl = '';
-      
+
       if (isImage) {
         // For images, create a data URL
         const blob = new Blob([response.arrayBuffer], { type: file.fileType });
@@ -168,7 +205,7 @@ export function SyncTab({ plugin }: { plugin: FileOrganizer }) {
         // For PDFs, we'll just use a PDF icon or first page if possible
         dataUrl = 'pdf'; // Just a marker that we have the PDF
       }
-      
+
       // Update cache
       setPreviewCache(prev => ({
         ...prev,
@@ -183,7 +220,7 @@ export function SyncTab({ plugin }: { plugin: FileOrganizer }) {
       setLoadingPreviews(prev => ({ ...prev, [file.id]: false }));
     }
   };
-  
+
   // Helper to convert Blob to data URL
   const blobToDataUrl = (blob: Blob): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -429,7 +466,7 @@ export function SyncTab({ plugin }: { plugin: FileOrganizer }) {
             {files.filter(f => downloadedFiles.has(f.id)).length} of {files.length} synced
           </p>
         </div>
-        
+
         {/* Icon-only tools */}
         <div className={tw("flex items-center gap-2")}>
           <button
@@ -440,7 +477,7 @@ export function SyncTab({ plugin }: { plugin: FileOrganizer }) {
           >
             <RefreshCw className={tw(`w-4 h-4 ${loading ? 'animate-spin' : ''}`)} />
           </button>
-          
+
           <button
             onClick={downloadAllMissingFiles}
             disabled={loading || syncingAll || files.filter(f => f.status === 'completed' && !downloadedFiles.has(f.id)).length === 0}
@@ -453,7 +490,7 @@ export function SyncTab({ plugin }: { plugin: FileOrganizer }) {
           >
             <DownloadCloud className={tw(`w-4 h-4 ${syncingAll ? 'animate-pulse' : ''}`)} />
           </button>
-          
+
           {downloadedFiles.size > 0 && (
             <button
               onClick={clearDownloadHistory}
@@ -468,7 +505,7 @@ export function SyncTab({ plugin }: { plugin: FileOrganizer }) {
 
       {/* File list - compact rows */}
       <div className={tw("flex-1 overflow-y-auto")}>
-      
+
 
       {error && (
         <div className={tw("px-3 py-2 bg-[--background-modifier-error] border-l-2 border-[--text-error]")}>
@@ -516,8 +553,8 @@ export function SyncTab({ plugin }: { plugin: FileOrganizer }) {
                   {/* Thumbnail (larger for images) */}
                   <div className={tw("mr-3 flex-shrink-0 overflow-hidden")}>
                     {file.fileType.startsWith('image/') ? (
-                      <img 
-                        src={file.previewUrl || file.blobUrl} 
+                      <img
+                        src={file.previewUrl || file.blobUrl}
                         alt={file.originalName}
                         className={tw("w-16 h-16 object-cover border border-[--background-modifier-border]")}
                         onError={(e) => {
@@ -527,14 +564,14 @@ export function SyncTab({ plugin }: { plugin: FileOrganizer }) {
                         }}
                       />
                     ) : null}
-                    <div 
+                    <div
                       className={tw("flex items-center justify-center w-6 h-6")}
                       style={{ display: file.fileType.startsWith('image/') ? 'none' : 'flex' }}
                     >
                       {getFileIcon(file.fileType, tw("w-4 h-4 text-[--text-muted]"))}
                     </div>
                   </div>
-                  
+
                   {/* File info */}
                   <div className={tw("flex-1 min-w-0 flex flex-col justify-center")}>
                     <div className={tw("text-sm text-[--text-normal] truncate font-medium")}>
@@ -547,7 +584,7 @@ export function SyncTab({ plugin }: { plugin: FileOrganizer }) {
                       )}
                     </div>
                   </div>
-                  
+
                   {/* Status icon */}
                   <div className={tw("w-5 h-5 flex items-center justify-center flex-shrink-0")}>
                     {downloading[file.id] ? (
@@ -571,8 +608,8 @@ export function SyncTab({ plugin }: { plugin: FileOrganizer }) {
                 onClick={() => setPage(p => Math.max(1, p - 1))}
                 disabled={page === 1}
                 className={tw(`px-4 py-2 h-auto transition-colors duration-200 flex items-center gap-2 ${
-                  page === 1 
-                    ? "bg-[--background-secondary] text-[--text-faint] cursor-not-allowed" 
+                  page === 1
+                    ? "bg-[--background-secondary] text-[--text-faint] cursor-not-allowed"
                     : "bg-[--background-primary] border border-[--background-modifier-border] hover:bg-[--background-secondary] text-[--text-normal]"
                 }`)}
               >
@@ -581,17 +618,17 @@ export function SyncTab({ plugin }: { plugin: FileOrganizer }) {
                 </svg>
                 <span>Previous</span>
               </Button>
-              
+
               <div className={tw("bg-[--background-secondary] border border-[--background-modifier-border] px-4 py-2 text-sm font-medium text-[--text-normal]")}>
                 Page {page} of {totalPages}
               </div>
-              
+
               <Button
                 onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                 disabled={page === totalPages}
                 className={tw(`px-4 py-2 h-auto transition-colors duration-200 flex items-center gap-2 ${
-                  page === totalPages 
-                    ? "bg-[--background-secondary] text-[--text-faint] cursor-not-allowed" 
+                  page === totalPages
+                    ? "bg-[--background-secondary] text-[--text-faint] cursor-not-allowed"
                     : "bg-[--background-primary] border border-[--background-modifier-border] hover:bg-[--background-secondary] text-[--text-normal]"
                 }`)}
               >
