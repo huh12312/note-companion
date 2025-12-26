@@ -16,7 +16,11 @@ import {
   getTokenCount,
   cleanup,
 } from "../utils/token-counter";
-import { isValidExtension, VALID_MEDIA_EXTENSIONS, VALID_AUDIO_EXTENSIONS } from "../constants";
+import {
+  isValidExtension,
+  VALID_MEDIA_EXTENSIONS,
+  VALID_AUDIO_EXTENSIONS,
+} from "../constants";
 import {
   safeCreate,
   safeRename,
@@ -489,6 +493,8 @@ async function recommendNameStep(
 
   context.recordManager.setNewName(context.hash, context.newName);
   await safeRename(context.plugin.app, context.containerFile, context.newName);
+  // Update file reference after rename (TFile path is automatically updated by Obsidian)
+  context.recordManager.setFile(context.hash, context.containerFile);
   return context;
 }
 
@@ -527,6 +533,8 @@ async function recommendFolderStep(
   context.newPath = newPath[0]?.folder;
   await safeMove(context.plugin.app, context.containerFile, context.newPath);
   context.recordManager.setFolder(context.hash, context.newPath);
+  // Update file reference after move (TFile path is automatically updated by Obsidian)
+  context.recordManager.setFile(context.hash, context.containerFile);
 
   return context;
 }
@@ -585,9 +593,11 @@ async function getContentStep(
 
   // For audio files, prepend the audio file link and title at the top
   let finalContent = content;
-  if (VALID_AUDIO_EXTENSIONS.includes(context.inboxFile?.extension) &&
-      context.attachmentFile &&
-      context.containerFile) {
+  if (
+    VALID_AUDIO_EXTENSIONS.includes(context.inboxFile?.extension) &&
+    context.attachmentFile &&
+    context.containerFile
+  ) {
     const audioFileName = context.attachmentFile.name;
     const audioLink = `![[${audioFileName}]]\n\n`;
     const transcriptHeader = `## Transcript for ${audioFileName}\n\n`;

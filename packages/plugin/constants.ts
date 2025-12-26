@@ -41,7 +41,7 @@ export const VALID_EXTENSIONS = [
 export const isValidExtension = (extension: string): boolean => {
   const isSupported = VALID_EXTENSIONS.includes(extension);
   if (!isSupported) {
-    new Notice("Sorry, FileOrganizer does not support this file type.");
+    new Notice("Sorry, Note Companion does not support this file type.");
   }
   return isSupported;
 };

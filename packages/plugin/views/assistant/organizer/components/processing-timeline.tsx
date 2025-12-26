@@ -73,11 +73,11 @@ export const ProcessingTimeline: React.FC<ProcessingTimelineProps> = ({ record }
   };
 
   const steps = getSteps();
-  
+
   // Calculate durations between steps
   const stepsWithDuration = steps.map((step, index) => {
     if (index === 0) return { ...step, duration: 0 };
-    
+
     const prevStep = steps[index - 1];
     if (step.timestamp && prevStep.timestamp) {
       const duration = new Date(step.timestamp).getTime() - new Date(prevStep.timestamp).getTime();
@@ -131,7 +131,7 @@ export const ProcessingTimeline: React.FC<ProcessingTimelineProps> = ({ record }
   }
 
   return (
-    <StyledContainer className={tw("bg-[--background-secondary] border-b border-[--background-modifier-border] p-4")}>
+    <StyledContainer className={tw("bg-[--background-secondary] rounded p-4")}>
       <div className={tw("flex items-center justify-between mb-4")}>
         <h4 className={tw("text-sm font-medium text-[--text-normal]")}>Processing Timeline</h4>
         <div className={tw("text-xs text-[--text-muted]")}>
@@ -147,9 +147,9 @@ export const ProcessingTimeline: React.FC<ProcessingTimelineProps> = ({ record }
             {/* Timeline connector */}
             <div className={tw("flex flex-col items-center")}>
               <div className={`w-8 h-8 rounded-full bg-[--background-primary] border-2 flex items-center justify-center ${
-                step.status === "completed" ? "border-[--text-success]" : 
-                step.status === "error" ? "border-[--text-error]" : 
-                step.status === "processing" ? "border-[--interactive-accent]" : 
+                step.status === "completed" ? "border-[--text-success]" :
+                step.status === "error" ? "border-[--text-error]" :
+                step.status === "processing" ? "border-[--interactive-accent]" :
                 "border-[--background-modifier-border]"
               }`}>
                 {getStepIcon(step.status)}

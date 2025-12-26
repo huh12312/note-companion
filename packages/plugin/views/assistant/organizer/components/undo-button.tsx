@@ -18,7 +18,7 @@ export const UndoButton: React.FC<UndoButtonProps> = ({ record, plugin, onUndo }
   const canUndo = React.useMemo(() => {
     // Can undo if the file was moved (has newPath) and is completed
     return record.status === "completed" && record.newPath && record.file;
-  }, [record]);
+  }, [record.status, record.newPath, record.file]);
 
   const handleUndo = async () => {
     if (!record.file || !record.newPath) {
@@ -30,16 +30,16 @@ export const UndoButton: React.FC<UndoButtonProps> = ({ record, plugin, onUndo }
     try {
       const app = plugin.app;
       const file = record.file;
-      
+
       // Get the inbox path to move file back to
       const inboxPath = plugin.settings.pathToWatch;
-      
+
       // Move file back to inbox
-      const originalName = record.originalName.endsWith('.md') 
-        ? record.originalName 
+      const originalName = record.originalName.endsWith('.md')
+        ? record.originalName
         : `${record.originalName}.md`;
       const targetPath = `${inboxPath}/${originalName}`;
-      
+
       // Check if target already exists
       const existing = app.vault.getAbstractFileByPath(targetPath);
       if (existing) {
@@ -63,7 +63,7 @@ export const UndoButton: React.FC<UndoButtonProps> = ({ record, plugin, onUndo }
       }
 
       new Notice(`Undid processing for ${record.originalName}`);
-      
+
       // Call the onUndo callback if provided
       if (onUndo) {
         onUndo();

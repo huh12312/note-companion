@@ -355,7 +355,27 @@ export class RecordManager {
 
   // Query methods for multiple records
   public getAllRecords(): FileRecord[] {
-    return Array.from(this.records.values());
+    const records = Array.from(this.records.values());
+
+    // Refresh file references for records that have newPath but missing file reference
+    // This ensures the undo button appears consistently for all completed records
+    records.forEach(record => {
+      if (!record.file && record.newPath && record.status === "completed") {
+        // Try to find the file at the new location
+        // Construct the full path: newPath + newName (or originalName if newName not set)
+        const fileName = record.newName || record.originalName;
+        // Ensure .md extension
+        const fileNameWithExt = fileName.endsWith('.md') ? fileName : `${fileName}.md`;
+        const filePath = `${record.newPath}/${fileNameWithExt}`;
+        const file = this.app.vault.getAbstractFileByPath(filePath);
+
+        if (file instanceof TFile) {
+          record.file = file;
+        }
+      }
+    });
+
+    return records;
   }
 
   public getRecordsWithErrors(): FileRecord[] {

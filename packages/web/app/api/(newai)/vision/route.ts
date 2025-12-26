@@ -12,8 +12,8 @@ export async function POST(request: NextRequest) {
     const { userId } = await handleAuthorizationV2(request);
     const model = getModel();
 
-    const defaultInstruction = "Extract text from image. If there's a drawing, describe it.";
-    const responseInstruction = "Respond with only the extracted text or description.";
+    const defaultInstruction = "Extract all text from the image comprehensively, preserving formatting. Focus only on extracting readable text, not describing visual elements.";
+    const responseInstruction = "Respond with only the extracted text.";
 
     const promptText = payload.instructions?.trim()
       ? `${defaultInstruction} ${payload.instructions} ${responseInstruction}`

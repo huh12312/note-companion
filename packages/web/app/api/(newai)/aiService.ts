@@ -216,7 +216,7 @@ export async function extractTextFromImage(
       content: [
         {
           type: "text",
-          text: "Extract text from image. If there's a drawing, describe it. Respond with only the extracted text or description.",
+          text: "Extract all text from the image comprehensively, preserving formatting. Focus only on extracting readable text, not describing visual elements. Respond with only the extracted text.",
         },
         {
           type: "image",

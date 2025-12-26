@@ -92,14 +92,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Lifetime licenses are always active
-    const isActive = userUsage[0].billingCycle === 'lifetime' ||
-                     userUsage[0].subscriptionStatus === 'active';
+    const isActive =
+      userUsage[0].billingCycle === 'lifetime' ||
+      userUsage[0].subscriptionStatus === 'active';
 
     return NextResponse.json({
       tokenUsage: userUsage[0].tokenUsage || 0,
       maxTokenUsage: userUsage[0].maxTokenUsage || 100000,
       audioTranscriptionMinutes: userUsage[0].audioTranscriptionMinutes || 0,
-      maxAudioTranscriptionMinutes: userUsage[0].maxAudioTranscriptionMinutes || 0,
+      maxAudioTranscriptionMinutes:
+        userUsage[0].maxAudioTranscriptionMinutes || 0,
       subscriptionStatus: userUsage[0].subscriptionStatus || 'inactive',
       currentPlan: userUsage[0].currentPlan || 'Legacy Plan',
       isActive,
