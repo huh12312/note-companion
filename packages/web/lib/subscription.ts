@@ -24,7 +24,7 @@ export async function getUserSubscriptionStatus(userId: string): Promise<Subscri
       active: false
     };
   }
-  
+
   try {
     // Fetch the user subscription status from the database
     const userUsage = await db
@@ -33,7 +33,7 @@ export async function getUserSubscriptionStatus(userId: string): Promise<Subscri
       .where(eq(UserUsageTable.userId, userId))
       .limit(1)
       .execute();
-    
+
     // If no user usage record found, return default values
     if (!userUsage.length) {
       return {
@@ -44,14 +44,16 @@ export async function getUserSubscriptionStatus(userId: string): Promise<Subscri
         active: false
       };
     }
-    
+
     // Return the subscription data
     const { subscriptionStatus, paymentStatus, currentProduct, billingCycle } = userUsage[0];
-    
+
     // Determine if the subscription is active
-    const active = subscriptionStatus === "active" && 
-                  (paymentStatus === "paid" || paymentStatus === "succeeded");
-    
+    // Lifetime licenses are always active
+    const active = billingCycle === "lifetime" ||
+                  (subscriptionStatus === "active" &&
+                   (paymentStatus === "paid" || paymentStatus === "succeeded"));
+
     return {
       subscriptionStatus,
       paymentStatus,

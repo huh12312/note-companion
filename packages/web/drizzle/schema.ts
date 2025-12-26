@@ -424,6 +424,11 @@ export const isSubscriptionActive = async (
       return true;
     }
 
+    // Lifetime licenses are always active
+    if (userUsage[0].billingCycle === 'lifetime') {
+      return true;
+    }
+
     // Check for paid tiers - only check payment status
     return (
       userUsage[0].paymentStatus === 'paid' ||

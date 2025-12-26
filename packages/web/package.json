@@ -18,7 +18,8 @@
     "db:studio:prod": "pnpm dotenv -e .env.production.local -- drizzle-kit studio",
     "sync-subscriptions": "pnpm dotenv -c -- tsx scripts/sync-subscriptions.ts",
     "find-active-subs": "pnpm dotenv -c -- tsx scripts/find-active-subscriptions.ts",
-    "report": "pnpm dotenv -c -- tsx scripts/get-detailed-report.ts"
+    "report": "pnpm dotenv -c -- tsx scripts/get-detailed-report.ts",
+    "fix-lifetime-users": "pnpm dotenv -c -- tsx scripts/fix-lifetime-user.ts"
   },
   "dependencies": {
     "@ai-sdk/amazon-bedrock": "catalog:",
