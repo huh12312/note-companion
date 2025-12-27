@@ -44,6 +44,23 @@ export async function POST(req: NextRequest) {
       }, { status: 400 });
     }
 
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return NextResponse.json({
+        success: false,
+        error: "Invalid email format",
+      }, { status: 400 });
+    }
+
+    // Validate password requirements (Clerk typically requires min 8 chars)
+    if (password.length < 8) {
+      return NextResponse.json({
+        success: false,
+        error: "Password must be at least 8 characters long",
+      }, { status: 400 });
+    }
+
     // Check if user already exists - handle clerkClient as a function
     const clerk = await clerkClient();
     const existingUsersResponse = await clerk.users.getUserList({
@@ -83,8 +100,25 @@ export async function POST(req: NextRequest) {
       licenseKey: licenseKeyResult.key.key,
       userId: user.id,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error creating user:", error);
+
+    // Log detailed Clerk errors if available
+    if (error.clerkError && error.errors) {
+      console.error("Clerk validation errors:", JSON.stringify(error.errors, null, 2));
+    }
+
+    // If it's a Clerk error, return the actual error details
+    if (error.clerkError) {
+      const statusCode = error.status || 500;
+      const errorMessage = error.errors?.[0]?.message || error.message || "An error occurred while creating your account";
+
+      return NextResponse.json({
+        success: false,
+        error: errorMessage,
+        details: error.errors, // Include full error details for debugging
+      }, { status: statusCode });
+    }
 
     return NextResponse.json({
       success: false,
