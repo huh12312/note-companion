@@ -12,7 +12,8 @@ const HANDLERS = {
   "checkout.session.completed": handleCheckoutComplete,
   "customer.subscription.deleted": handleSubscriptionCanceled,
   "customer.subscription.updated": handleSubscriptionUpdated,
-  // "invoice.paid": handleInvoicePaid,
+  "invoice.paid": handleInvoicePaid,
+  "invoice.payment_succeeded": handleInvoicePaid, // Handle both old and new event names
   "invoice.payment_failed": handleInvoicePaymentFailed,
   // "payment_intent.succeeded": handlePaymentIntentSucceeded,
 } as const;
@@ -25,8 +26,12 @@ export async function POST(req: NextRequest) {
     const handler = HANDLERS[event.type as keyof typeof HANDLERS];
 
     // Use the validateWebhookMetadata helper from srm.config
+    // For invoice events, metadata might be in subscription_details.metadata instead
     const metadata = event.data.object.metadata;
-    if (metadata && !validateWebhookMetadata(metadata)) {
+    const isInvoiceEvent = event.type.startsWith('invoice.');
+
+    // Skip metadata validation for invoice events as they may have metadata in subscription_details
+    if (metadata && !isInvoiceEvent && !validateWebhookMetadata(metadata)) {
       console.warn(`Invalid metadata for event ${event.type}`);
       // Continue processing as some events may not need complete metadata
     }

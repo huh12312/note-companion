@@ -5,7 +5,7 @@ import { incrementAndLogTokenUsage } from '@/lib/incrementAndLogTokenUsage';
 import { handleAuthorizationV2 } from '@/lib/handleAuthorization';
 import { getModel } from '@/lib/models';
 
-export const maxDuration = 60;
+export const maxDuration = 800;
 
 export async function POST(request: NextRequest) {
   try {

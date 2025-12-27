@@ -4,7 +4,7 @@ import { incrementAndLogTokenUsage } from "@/lib/incrementAndLogTokenUsage";
 import { handleAuthorizationV2 } from "@/lib/handleAuthorization";
 import { getModel } from "@/lib/models";
 
-export const maxDuration = 60; // This function can run for a maximum of 5 seconds
+export const maxDuration = 800; // Maximum allowed for Vercel Pro plan (13.3 minutes) for large content formatting
 
 export async function POST(request: NextRequest) {
   try {

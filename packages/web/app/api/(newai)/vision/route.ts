@@ -4,7 +4,7 @@ import { getModel } from "@/lib/models";
 import { handleAuthorizationV2 } from "@/lib/handleAuthorization";
 import { incrementAndLogTokenUsage } from "@/lib/incrementAndLogTokenUsage";
 
-export const maxDuration = 60;
+export const maxDuration = 300; // Vision models can be slower for complex images
 
 export async function POST(request: NextRequest) {
   try {

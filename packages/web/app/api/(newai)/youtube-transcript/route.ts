@@ -4,7 +4,7 @@ import { Innertube } from 'youtubei.js';
 import { fetchTranscript } from 'youtube-transcript-plus';
 
 export const runtime = 'nodejs';
-export const maxDuration = 60;
+export const maxDuration = 300; // Network operations and transcript parsing can occasionally be slow
 
 // Cache the Innertube instance
 let ytInstance: Innertube | null = null;

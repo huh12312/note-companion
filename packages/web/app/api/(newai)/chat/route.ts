@@ -12,7 +12,7 @@ import { getModel, getResponsesModel } from '@/lib/models';
 import { getChatSystemPrompt } from '@/lib/prompts/chat-prompt';
 import { chatTools } from './tools';
 
-export const maxDuration = 60;
+export const maxDuration = 300; // Allow for complex multi-step tool calls and long conversations
 
 export async function POST(req: NextRequest) {
   return createDataStreamResponse({

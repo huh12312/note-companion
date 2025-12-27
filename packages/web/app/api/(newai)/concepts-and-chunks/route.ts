@@ -5,7 +5,7 @@ import { handleAuthorizationV2 } from '@/lib/handleAuthorization';
 import { generateObject, LanguageModel } from 'ai';
 import { z } from 'zod';
 
-export const maxDuration = 60;
+export const maxDuration = 300; // Large document analysis can take significant time
 
 // Move the schema definition to the top level for better predictability
 const conceptsSchema = z.object({
