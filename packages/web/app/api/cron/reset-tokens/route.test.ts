@@ -149,4 +149,149 @@ describe('Token Reset Cron Job', () => {
     // Restore the original update implementation
     db.update = originalUpdate;
   });
+
+  describe('Top-up token preservation', () => {
+    it('should preserve unused top-up tokens when resetting', async () => {
+      // User with 10M total (5M subscription + 5M top-up), used 3M
+      await db
+        .update(UserUsageTable)
+        .set({
+          maxTokenUsage: monthlyTokenLimit + 5000000, // 10M total
+          tokenUsage: 3000000, // 3M used (all from subscription)
+        })
+        .where(eq(UserUsageTable.userId, mockUserId));
+
+      const request = new NextRequest('http://localhost/api/cron/reset-tokens', {
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${process.env.CRON_SECRET}`,
+        },
+      });
+
+      await GET(request);
+
+      const userUsage = await db
+        .select()
+        .from(UserUsageTable)
+        .where(eq(UserUsageTable.userId, mockUserId));
+
+      expect(userUsage[0].tokenUsage).toBe(0);
+      expect(userUsage[0].maxTokenUsage).toBe(monthlyTokenLimit + 5000000); // 10M preserved
+    });
+
+    it('should preserve remaining top-up tokens when some were consumed', async () => {
+      // User with 10M total (5M subscription + 5M top-up), used 8M
+      await db
+        .update(UserUsageTable)
+        .set({
+          maxTokenUsage: monthlyTokenLimit + 5000000, // 10M total
+          tokenUsage: 8000000, // 8M used (5M subscription + 3M top-up)
+        })
+        .where(eq(UserUsageTable.userId, mockUserId));
+
+      const request = new NextRequest('http://localhost/api/cron/reset-tokens', {
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${process.env.CRON_SECRET}`,
+        },
+      });
+
+      await GET(request);
+
+      const userUsage = await db
+        .select()
+        .from(UserUsageTable)
+        .where(eq(UserUsageTable.userId, mockUserId));
+
+      expect(userUsage[0].tokenUsage).toBe(0);
+      // Should have 5M subscription + 2M remaining top-up = 7M
+      expect(userUsage[0].maxTokenUsage).toBe(monthlyTokenLimit + 2000000);
+    });
+
+    it('should not restore consumed top-up tokens', async () => {
+      // User with 10M total (5M subscription + 5M top-up), used 10M (all consumed)
+      await db
+        .update(UserUsageTable)
+        .set({
+          maxTokenUsage: monthlyTokenLimit + 5000000, // 10M total
+          tokenUsage: 10000000, // 10M used (5M subscription + 5M top-up)
+        })
+        .where(eq(UserUsageTable.userId, mockUserId));
+
+      const request = new NextRequest('http://localhost/api/cron/reset-tokens', {
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${process.env.CRON_SECRET}`,
+        },
+      });
+
+      await GET(request);
+
+      const userUsage = await db
+        .select()
+        .from(UserUsageTable)
+        .where(eq(UserUsageTable.userId, mockUserId));
+
+      expect(userUsage[0].tokenUsage).toBe(0);
+      // Should have only 5M subscription, no top-up (all consumed)
+      expect(userUsage[0].maxTokenUsage).toBe(monthlyTokenLimit);
+    });
+
+    it('should reset users without top-ups to 5M normally', async () => {
+      // User with only subscription tokens, no top-up
+      await db
+        .update(UserUsageTable)
+        .set({
+          maxTokenUsage: monthlyTokenLimit, // 5M (subscription only)
+          tokenUsage: 3000000, // 3M used
+        })
+        .where(eq(UserUsageTable.userId, mockUserId));
+
+      const request = new NextRequest('http://localhost/api/cron/reset-tokens', {
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${process.env.CRON_SECRET}`,
+        },
+      });
+
+      await GET(request);
+
+      const userUsage = await db
+        .select()
+        .from(UserUsageTable)
+        .where(eq(UserUsageTable.userId, mockUserId));
+
+      expect(userUsage[0].tokenUsage).toBe(0);
+      expect(userUsage[0].maxTokenUsage).toBe(monthlyTokenLimit); // 5M
+    });
+
+    it('should handle users with maxTokenUsage less than monthly limit', async () => {
+      // Edge case: User with less than subscription limit (shouldn't happen, but handle gracefully)
+      await db
+        .update(UserUsageTable)
+        .set({
+          maxTokenUsage: 3000000, // 3M (less than subscription limit)
+          tokenUsage: 2000000, // 2M used
+        })
+        .where(eq(UserUsageTable.userId, mockUserId));
+
+      const request = new NextRequest('http://localhost/api/cron/reset-tokens', {
+        method: 'GET',
+        headers: {
+          authorization: `Bearer ${process.env.CRON_SECRET}`,
+        },
+      });
+
+      await GET(request);
+
+      const userUsage = await db
+        .select()
+        .from(UserUsageTable)
+        .where(eq(UserUsageTable.userId, mockUserId));
+
+      expect(userUsage[0].tokenUsage).toBe(0);
+      // Should reset to subscription limit
+      expect(userUsage[0].maxTokenUsage).toBe(monthlyTokenLimit);
+    });
+  });
 });

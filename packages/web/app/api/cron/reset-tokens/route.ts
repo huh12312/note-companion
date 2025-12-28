@@ -1,5 +1,5 @@
 import { db, UserUsageTable } from '@/drizzle/schema';
-import { eq, and, or } from 'drizzle-orm';
+import { eq, and, or, sql } from 'drizzle-orm';
 import { NextResponse } from 'next/server';
 
 export const runtime = 'edge';
@@ -9,11 +9,18 @@ async function resetTokenUsage() {
   const monthlyAudioTranscriptionLimit = 300; // 300 minutes per month for paid users
 
   // Reset tokens and audio transcription minutes for active subscribers with valid plans
+  // Preserve remaining top-up tokens (one-time purchases that deplete when used)
   const result = await db
     .update(UserUsageTable)
     .set({
       tokenUsage: 0,
-      maxTokenUsage: monthlyTokenLimit,
+      maxTokenUsage: sql`
+        ${monthlyTokenLimit} + GREATEST(
+          GREATEST(${UserUsageTable.maxTokenUsage} - ${monthlyTokenLimit}, 0) -
+          GREATEST(${UserUsageTable.tokenUsage} - ${monthlyTokenLimit}, 0),
+          0
+        )
+      `,
       audioTranscriptionMinutes: 0,
       maxAudioTranscriptionMinutes: monthlyAudioTranscriptionLimit, // 300 minutes for paid users
     })

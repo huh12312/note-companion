@@ -1,22 +1,29 @@
-import { createWebhookHandler } from "../handler-factory";
-import { db, UserUsageTable } from "@/drizzle/schema";
-import { eq } from "drizzle-orm";
-import { trackLoopsEvent } from "@/lib/services/loops";
-import Stripe from "stripe";
+import { createWebhookHandler } from '../handler-factory';
+import { db, UserUsageTable } from '@/drizzle/schema';
+import { eq, sql } from 'drizzle-orm';
+import { trackLoopsEvent } from '@/lib/services/loops';
+import Stripe from 'stripe';
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: "2024-06-20",
+  apiVersion: '2024-06-20',
 });
 
 async function resetUserUsageAndSetLastPayment(userId: string) {
-  console.log("resetUserUsageAndSetLastPayment", userId);
+  console.log('resetUserUsageAndSetLastPayment', userId);
   // Reset usage to 0 but set max tokens and audio transcription to monthly allotment
-  // This replaces the token balance on renewal (not additive)
+  // Preserve remaining top-up tokens (one-time purchases that deplete when used)
+  const monthlyTokenLimit = 5000 * 1000; // 5M tokens per month
   await db
     .update(UserUsageTable)
     .set({
       tokenUsage: 0,
-      maxTokenUsage: 5000 * 1000, // 5M tokens per month
+      maxTokenUsage: sql`
+        ${monthlyTokenLimit} + GREATEST(
+          GREATEST(${UserUsageTable.maxTokenUsage} - ${monthlyTokenLimit}, 0) -
+          GREATEST(${UserUsageTable.tokenUsage} - ${monthlyTokenLimit}, 0),
+          0
+        )
+      `,
       audioTranscriptionMinutes: 0,
       maxAudioTranscriptionMinutes: 300, // 300 minutes per month for paid users
       lastPayment: new Date(),
@@ -24,12 +31,10 @@ async function resetUserUsageAndSetLastPayment(userId: string) {
     .where(eq(UserUsageTable.userId, userId));
 }
 
-
-
 export const handleInvoicePaid = createWebhookHandler(
   async (event) => {
     const invoice = event.data.object as Stripe.Invoice;
-    console.log("invoice paid", invoice);
+    console.log('invoice paid', invoice);
 
     // Try to get userId from subscription_details.metadata first (most reliable)
     // Fallback to invoice.metadata if subscription_details is not available
@@ -45,33 +50,33 @@ export const handleInvoicePaid = createWebhookHandler(
     }
 
     if (!userId) {
-      console.warn("No userId found in invoice metadata or subscription_details.metadata");
+      console.warn(
+        'No userId found in invoice metadata or subscription_details.metadata'
+      );
       return {
         success: true,
-        message: "Skipped invoice without userId",
+        message: 'Skipped invoice without userId',
       };
     }
 
     if (!metadata) {
       return {
         success: false,
-        message: "No metadata found in invoice",
+        message: 'No metadata found in invoice',
       };
     }
 
-    // Note: This sets (not adds) tokens - subscription renewals get fresh allotment
-    // If we wanted additive behavior, we'd use sql`COALESCE(...) + 5000000`
+    // Note: This sets subscription tokens but preserves remaining top-up tokens
+    // Top-up tokens are one-time purchases that deplete when used
+    const monthlyTokenLimit = 5000 * 1000; // 5M tokens per month
     await db
       .insert(UserUsageTable)
       .values({
         userId: userId,
         subscriptionStatus: invoice.status,
         paymentStatus: invoice.status,
-        billingCycle: metadata.type as
-          | "monthly"
-          | "yearly"
-          | "lifetime",
-        maxTokenUsage: 5000 * 1000, // Reset to 5M tokens (not additive)
+        billingCycle: metadata.type as 'monthly' | 'yearly' | 'lifetime',
+        maxTokenUsage: monthlyTokenLimit, // For new users, set to subscription limit
         maxAudioTranscriptionMinutes: 300, // 300 minutes per month for paid users
         lastPayment: new Date(),
         currentProduct: metadata.product,
@@ -82,12 +87,15 @@ export const handleInvoicePaid = createWebhookHandler(
         set: {
           subscriptionStatus: invoice.status,
           paymentStatus: invoice.status,
-          maxTokenUsage: 5000 * 1000, // Reset to 5M tokens (not additive)
+          maxTokenUsage: sql`
+            ${monthlyTokenLimit} + GREATEST(
+              GREATEST(${UserUsageTable.maxTokenUsage} - ${monthlyTokenLimit}, 0) -
+              GREATEST(${UserUsageTable.tokenUsage} - ${monthlyTokenLimit}, 0),
+              0
+            )
+          `,
           maxAudioTranscriptionMinutes: 300, // 300 minutes per month for paid users
-          billingCycle: metadata.type as
-            | "monthly"
-            | "yearly"
-            | "lifetime",
+          billingCycle: metadata.type as 'monthly' | 'yearly' | 'lifetime',
           lastPayment: new Date(),
           currentProduct: metadata.product,
           currentPlan: metadata.plan,
@@ -97,20 +105,20 @@ export const handleInvoicePaid = createWebhookHandler(
     await resetUserUsageAndSetLastPayment(userId);
 
     await trackLoopsEvent({
-      email: invoice.customer_email || "",
+      email: invoice.customer_email || '',
       userId: userId,
-      eventName: "invoice_paid",
+      eventName: 'invoice_paid',
       data: {
         amount: invoice.amount_paid,
         product:
-          invoice.lines.data[0].price?.metadata?.srm_product_key || "default",
-        plan: invoice.lines.data[0].price?.metadata?.srm_price_key || "default",
+          invoice.lines.data[0].price?.metadata?.srm_product_key || 'default',
+        plan: invoice.lines.data[0].price?.metadata?.srm_price_key || 'default',
       },
     });
 
     return {
       success: true,
-      message: "Invoice paid",
+      message: 'Invoice paid',
     };
   },
   {

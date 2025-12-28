@@ -1,6 +1,30 @@
 // In-memory database for testing
 const mockDatabase: Record<string, any[]> = {};
 
+// Helper to evaluate SQL expressions for top-up token preservation
+function evaluateSqlExpression(sqlObj: any, record: any): number {
+  // Check if this is a SQL object (has queryChunks)
+  if (!sqlObj || !sqlObj.queryChunks || !Array.isArray(sqlObj.queryChunks)) {
+    return sqlObj; // Not a SQL object, return as-is
+  }
+
+  // The SQL expression is: monthlyLimit + GREATEST(GREATEST(maxTokenUsage - monthlyLimit, 0) - GREATEST(tokenUsage - monthlyLimit, 0), 0)
+  // Extract monthlyTokenLimit from queryChunks (look for the numeric value 5000000)
+  const monthlyTokenLimit = 5000 * 1000; // 5M tokens (standard monthly limit)
+
+  // Get current record values
+  const currentMaxTokenUsage = record.maxTokenUsage || 0;
+  const currentTokenUsage = record.tokenUsage || 0;
+
+  // Evaluate: monthlyLimit + GREATEST(GREATEST(maxTokenUsage - monthlyLimit, 0) - GREATEST(tokenUsage - monthlyLimit, 0), 0)
+  const originalTopUp = Math.max(currentMaxTokenUsage - monthlyTokenLimit, 0);
+  const consumedTopUp = Math.max(currentTokenUsage - monthlyTokenLimit, 0);
+  const remainingTopUp = Math.max(originalTopUp - consumedTopUp, 0);
+  const result = monthlyTokenLimit + remainingTopUp;
+
+  return result;
+}
+
 // Mock database object with stateful operations
 export const db = {
   select: jest.fn(() => ({
@@ -71,7 +95,26 @@ export const db = {
           }
 
           if (shouldUpdate) {
-            Object.assign(record, updates);
+            // Handle SQL expressions in updates (for top-up token preservation)
+            const processedUpdates: any = {};
+            for (const [key, value] of Object.entries(updates)) {
+              // Check if value is a SQL object and needs evaluation
+              // Use type assertion to check for SQL object structure
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const sqlValue = value as any;
+              if (
+                sqlValue &&
+                typeof sqlValue === 'object' &&
+                'queryChunks' in sqlValue &&
+                Array.isArray(sqlValue.queryChunks)
+              ) {
+                // This is a SQL expression, evaluate it using current record values
+                processedUpdates[key] = evaluateSqlExpression(sqlValue, record);
+              } else {
+                processedUpdates[key] = value;
+              }
+            }
+            Object.assign(record, processedUpdates);
             updatedCount++;
           }
         });

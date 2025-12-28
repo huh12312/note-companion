@@ -21,6 +21,10 @@ const handleSubscription = async (
   const metadata = session.metadata;
   console.log('creating subscription with metadata', metadata);
 
+  // Preserve remaining top-up tokens when subscribing or upgrading
+  // Top-up tokens are one-time purchases that deplete when used
+  const monthlyTokenLimit = 5000 * 1000; // 5 million tokens
+
   // insert or update
   await db
     .insert(UserUsageTable)
@@ -28,7 +32,7 @@ const handleSubscription = async (
       userId: metadata.userId,
       subscriptionStatus: 'active',
       paymentStatus: 'paid',
-      maxTokenUsage: 5000 * 1000, // 5 million tokens
+      maxTokenUsage: monthlyTokenLimit, // For new users, set to subscription limit
       maxAudioTranscriptionMinutes: 300, // 300 minutes per month for paid subscriptions
       billingCycle: metadata.type,
       lastPayment: new Date(),
@@ -42,7 +46,13 @@ const handleSubscription = async (
       set: {
         subscriptionStatus: 'active',
         paymentStatus: 'paid',
-        maxTokenUsage: 5000 * 1000, // Ensure token limit is updated on upgrade
+        maxTokenUsage: sql`
+          ${monthlyTokenLimit} + GREATEST(
+            GREATEST(${UserUsageTable.maxTokenUsage} - ${monthlyTokenLimit}, 0) -
+            GREATEST(${UserUsageTable.tokenUsage} - ${monthlyTokenLimit}, 0),
+            0
+          )
+        `,
         maxAudioTranscriptionMinutes: 300, // 300 minutes per month for paid subscriptions
         billingCycle: metadata.type,
         lastPayment: new Date(),
