@@ -116,10 +116,13 @@ export async function POST(req: NextRequest) {
               if (contextItems.youtubeVideos) {
                 console.log(
                   `[Chat API] YouTube videos object:`,
-                  JSON.stringify(contextItems.youtubeVideos, null, 2).substring(
-                    0,
-                    1000
-                  )
+                  contextItems.youtubeVideos != null
+                    ? JSON.stringify(
+                        contextItems.youtubeVideos,
+                        null,
+                        2
+                      ).substring(0, 1000)
+                    : '(no videos)'
                 );
                 const firstVideoId = Object.keys(contextItems.youtubeVideos)[0];
                 if (firstVideoId) {
@@ -329,14 +332,18 @@ export async function POST(req: NextRequest) {
             const resultPreview =
               typeof tool.content === 'string'
                 ? tool.content.substring(0, 500)
-                : JSON.stringify(tool.content).substring(0, 500);
+                : tool.content != null
+                ? JSON.stringify(tool.content).substring(0, 500)
+                : '(no content)';
             console.log(`[Chat API] Tool result ${idx + 1}:`, {
               toolCallId: tool.toolCallId,
               toolName: tool.toolName,
               contentLength:
                 typeof tool.content === 'string'
                   ? tool.content.length
-                  : JSON.stringify(tool.content).length,
+                  : tool.content != null
+                  ? JSON.stringify(tool.content).length
+                  : 0,
               contentPreview: resultPreview,
               hasYouTubeTranscript:
                 typeof tool.content === 'string' &&
@@ -362,11 +369,15 @@ export async function POST(req: NextRequest) {
                   resultLength:
                     typeof invocation.result === 'string'
                       ? invocation.result.length
-                      : JSON.stringify(invocation.result).length,
+                      : invocation.result != null
+                      ? JSON.stringify(invocation.result).length
+                      : 0,
                   resultPreview:
                     typeof invocation.result === 'string'
                       ? invocation.result.substring(0, 500)
-                      : JSON.stringify(invocation.result).substring(0, 500),
+                      : invocation.result != null
+                      ? JSON.stringify(invocation.result).substring(0, 500)
+                      : '(no result)',
                   hasYouTubeTranscript:
                     typeof invocation.result === 'string' &&
                     invocation.result.includes('FULL TRANSCRIPT'),
@@ -390,8 +401,22 @@ export async function POST(req: NextRequest) {
         if (shouldUseSearch) {
           console.log(`Search grounding enabled (deep: ${deepSearch})`);
 
+          // Filter out pending tool invocations before converting
+          const messagesWithResults = messages.map((message: any) => {
+            if (message.role === 'assistant' && message.toolInvocations) {
+              return {
+                ...message,
+                toolInvocations: message.toolInvocations.filter(
+                  (invocation: any) =>
+                    'result' in invocation || invocation.state === 'result'
+                ),
+              };
+            }
+            return message;
+          });
+
           // Convert messages to core format to ensure tool results are properly included
-          const coreMessages = convertToCoreMessages(messages);
+          const coreMessages = convertToCoreMessages(messagesWithResults);
           console.log(
             `[Chat API] Converted ${messages.length} messages to ${coreMessages.length} core messages (search mode)`
           );
@@ -452,9 +477,23 @@ export async function POST(req: NextRequest) {
             );
           }
 
+          // Filter out pending tool invocations before converting
+          const messagesWithResults = messages.map((message: any) => {
+            if (message.role === 'assistant' && message.toolInvocations) {
+              return {
+                ...message,
+                toolInvocations: message.toolInvocations.filter(
+                  (invocation: any) =>
+                    'result' in invocation || invocation.state === 'result'
+                ),
+              };
+            }
+            return message;
+          });
+
           // Convert messages to core format - convertToCoreMessages handles tool invocations correctly
           // Tool results should already be in the correct format (plain strings, not JSON-encoded)
-          const coreMessages = convertToCoreMessages(messages);
+          const coreMessages = convertToCoreMessages(messagesWithResults);
           console.log(
             `[Chat API] Converted ${messages.length} messages to ${coreMessages.length} core messages`
           );
