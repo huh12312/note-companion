@@ -24,6 +24,16 @@ const LicenseForm = () => {
 
   const { user } = useUser();
 
+  // Load key from localStorage on mount
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const storedKey = localStorage.getItem('noteCompanionLicenseKey');
+      if (storedKey) {
+        setLicenseKey(storedKey);
+      }
+    }
+  }, []);
+
   const handleCreateKey = async () => {
     setLoading(true);
     try {
@@ -33,7 +43,12 @@ const LicenseForm = () => {
         return;
       }
       if ('key' in res && res.key?.key) {
-        setLicenseKey(res.key.key);
+        const newKey = res.key.key;
+        setLicenseKey(newKey);
+        // Store in localStorage for persistence
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('noteCompanionLicenseKey', newKey);
+        }
       } else {
         alert(
           'Failed to create license key. Please try again or contact support.'
