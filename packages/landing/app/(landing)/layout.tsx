@@ -8,8 +8,11 @@ import { Button } from '@/components/ui/button';
 import { Star, Smartphone, ExternalLink } from 'lucide-react';
 import { getGitHubStars } from '@/lib/github';
 
+const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ||
+  (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'https://www.notecompanion.ai');
+
 export const metadata: Metadata = {
-  metadataBase: new URL('https://notecompanion.com'),
+  metadataBase: new URL(siteUrl),
   title: {
     default: 'Note Companion - Your AI-powered Knowledge Partner',
     template: '%s | Note Companion',
@@ -24,7 +27,7 @@ export const metadata: Metadata = {
   openGraph: {
     type: 'website',
     locale: 'en_US',
-    url: 'https://notecompanion.com',
+    url: siteUrl,
     siteName: 'Note Companion',
     images: ['/notecompanion.png'],
   },

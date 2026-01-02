@@ -1,19 +1,24 @@
-import { GeistSans } from "geist/font/sans";
-import "./globals.css";
-import { Metadata } from "next";
-import Providers from "./providers";
+import { GeistSans } from 'geist/font/sans';
+import './globals.css';
+import { Metadata } from 'next';
+import Providers from './providers';
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "https://notecompanion.com"),
+  metadataBase: new URL(
+    process.env.NEXT_PUBLIC_SITE_URL ||
+      (process.env.VERCEL_URL
+        ? `https://${process.env.VERCEL_URL}`
+        : 'https://www.notecompanion.ai')
+  ),
   title: {
-    default: "Note Companion",
-    template: "%s | Note Companion",
+    default: 'Note Companion',
+    template: '%s | Note Companion',
   },
-  description: "Your AI-powered assistant for Obsidian.",
+  description: 'Your AI-powered assistant for Obsidian.',
   icons: {
-    icon: "/favicon.ico",
-    shortcut: "/favicon.ico",
-    apple: "/favicon.ico",
+    icon: '/favicon.ico',
+    shortcut: '/favicon.ico',
+    apple: '/favicon.ico',
   },
 };
 

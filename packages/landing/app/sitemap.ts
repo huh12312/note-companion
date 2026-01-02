@@ -3,9 +3,14 @@ import { getAllPosts } from '@/lib/blog';
 
 export default function sitemap(): MetadataRoute.Sitemap {
   // Use environment variable if available, otherwise default to notecompanion.ai
-  const baseUrl = process.env.NEXT_PUBLIC_SITE_URL ||
-    (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` :
-    'https://www.notecompanion.ai');
+  let baseUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ||
+    (process.env.VERCEL_URL
+      ? `https://${process.env.VERCEL_URL}`
+      : 'https://www.notecompanion.ai');
+
+  // Ensure URL doesn't have trailing slash
+  baseUrl = baseUrl.replace(/\/$/, '');
 
   // Static routes
   const staticRoutes: MetadataRoute.Sitemap = [
@@ -58,4 +63,3 @@ export default function sitemap(): MetadataRoute.Sitemap {
 
   return [...staticRoutes, ...blogRoutes];
 }
-

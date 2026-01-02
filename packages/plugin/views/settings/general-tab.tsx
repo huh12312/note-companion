@@ -355,6 +355,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
             width="100%"
             height="315"
             src="https://www.youtube.com/embed/X4yN4ykTJIo?si=QoMN-wNZSo1woQcB"
+            style={{ border: "none" }}
             allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
           ></iframe>
