@@ -158,26 +158,58 @@ export async function POST(req: NextRequest) {
                 });
               }
 
-              // Format YouTube videos - IMPORTANT: Include full transcript
+              // Format YouTube videos - Limit to prevent timeout
               if (
                 contextItems.youtubeVideos &&
                 Object.keys(contextItems.youtubeVideos).length > 0
               ) {
-                Object.values(contextItems.youtubeVideos).forEach(
-                  (video: any) => {
-                    const transcript = video.transcript || '';
-                    // Include full transcript (AI models can handle large contexts)
-                    parts.push(
-                      `YouTube Video: ${
-                        video.title || 'Untitled'
-                      }\n\nVideo ID: ${
-                        video.videoId || ''
-                      }\n\nFull Transcript:\n${transcript}\nReference: ${
-                        video.reference || ''
-                      }`
-                    );
-                  }
+                const MAX_YOUTUBE_TRANSCRIPTS = 10; // Limit to prevent timeout
+                const MAX_TRANSCRIPT_LENGTH = 8000; // Truncate very long transcripts
+                const youtubeVideos = Object.values(contextItems.youtubeVideos);
+                const videosToProcess = youtubeVideos.slice(
+                  0,
+                  MAX_YOUTUBE_TRANSCRIPTS
                 );
+                const skippedCount =
+                  youtubeVideos.length - videosToProcess.length;
+
+                videosToProcess.forEach((video: any) => {
+                  let transcript = video.transcript || '';
+
+                  // Truncate very long transcripts
+                  if (transcript.length > MAX_TRANSCRIPT_LENGTH) {
+                    transcript =
+                      transcript.substring(0, MAX_TRANSCRIPT_LENGTH) +
+                      `\n\n[Transcript truncated - original length: ${video.transcript.length} chars]`;
+                  }
+
+                  parts.push(
+                    `YouTube Video: ${video.title || 'Untitled'}\n\nVideo ID: ${
+                      video.videoId || ''
+                    }\n\nFull Transcript:\n${transcript}\nReference: ${
+                      video.reference || ''
+                    }`
+                  );
+                });
+
+                if (skippedCount > 0) {
+                  console.warn(
+                    `[Chat API] WARNING: ${youtubeVideos.length} YouTube videos in context, but only ${MAX_YOUTUBE_TRANSCRIPTS} processed to prevent timeout. ${skippedCount} video(s) skipped.`
+                  );
+
+                  // Send user-facing notification via data stream
+                  dataStream.writeData(
+                    JSON.stringify({
+                      type: 'notification',
+                      message: `⚠️ Processing limit: Only the first ${MAX_YOUTUBE_TRANSCRIPTS} YouTube videos will be processed in this request. ${skippedCount} additional video(s) were skipped to prevent timeout. Please make a separate request to process the remaining videos.`,
+                    })
+                  );
+
+                  // Add notice to context so AI can inform user
+                  parts.push(
+                    `\n\n[IMPORTANT NOTICE: Due to processing limits, only the first ${MAX_YOUTUBE_TRANSCRIPTS} YouTube video transcripts were processed in this request. ${skippedCount} additional video(s) were skipped to prevent timeout. Please make a separate request to process the remaining videos.]`
+                  );
+                }
               }
 
               // Format folders
@@ -421,10 +453,21 @@ export async function POST(req: NextRequest) {
             `[Chat API] Converted ${messages.length} messages to ${coreMessages.length} core messages (search mode)`
           );
 
+          // Reduce maxSteps when context is very large to prevent timeout
+          const contextSize = contextString.length;
+          const isLargeContext = contextSize > 100000; // > 100KB
+          const adaptiveMaxSteps = isLargeContext ? 3 : 5;
+
+          if (isLargeContext) {
+            console.log(
+              `[Chat API] Large context detected (${contextSize} chars) - reducing maxSteps to ${adaptiveMaxSteps} to prevent timeout`
+            );
+          }
+
           const result = await streamText({
             model: getResponsesModel() as any,
             system: getChatSystemPrompt(contextString, currentDatetime),
-            maxSteps: 5,
+            maxSteps: adaptiveMaxSteps,
             messages: coreMessages, // Use converted messages
             tools: {
               ...chatTools,
@@ -501,42 +544,78 @@ export async function POST(req: NextRequest) {
           // Extract toolCallId/toolName and YouTube transcripts from tool messages
           // Also add YouTube transcripts to contextString so model can definitely see them
           let youtubeTranscriptsInContext = '';
-          const finalCoreMessages = coreMessages.map((message) => {
-            if (message.role !== 'tool') {
-              return message;
-            }
+          let youtubeTranscriptCount = 0;
+          const MAX_YOUTUBE_TRANSCRIPTS = 10; // Limit to prevent timeout
+          const MAX_TRANSCRIPT_LENGTH = 8000; // Truncate very long transcripts
 
-            const tool = message as any;
+          const finalCoreMessages = coreMessages
+            .map((message) => {
+              if (message.role !== 'tool') {
+                return message;
+              }
 
-            // If toolCallId/toolName are missing but content is an array with tool-result objects
-            if (
-              (!tool.toolCallId || !tool.toolName) &&
-              Array.isArray(tool.content) &&
-              tool.content.length > 0
-            ) {
-              const firstItem = tool.content[0];
+              const tool = message as any;
+
+              // If toolCallId/toolName are missing but content is an array with tool-result objects
               if (
-                firstItem &&
-                typeof firstItem === 'object' &&
-                firstItem.type === 'tool-result' &&
-                firstItem.toolCallId &&
-                firstItem.toolName
+                (!tool.toolCallId || !tool.toolName) &&
+                Array.isArray(tool.content) &&
+                tool.content.length > 0
               ) {
-                console.log(
-                  `[Chat API] Extracting toolCallId/toolName from content array: ${firstItem.toolCallId}, ${firstItem.toolName}`
-                );
-
-                // If this is a YouTube video tool result, extract the transcript and add to context
+                const firstItem = tool.content[0];
                 if (
-                  firstItem.toolName === 'getYoutubeVideoId' &&
-                  firstItem.result &&
-                  typeof firstItem.result === 'string' &&
-                  firstItem.result.includes('FULL TRANSCRIPT')
+                  firstItem &&
+                  typeof firstItem === 'object' &&
+                  firstItem.type === 'tool-result' &&
+                  firstItem.toolCallId &&
+                  firstItem.toolName
                 ) {
                   console.log(
-                    `[Chat API] Extracting YouTube transcript from tool result to add to context (${firstItem.result.length} chars)`
+                    `[Chat API] Extracting toolCallId/toolName from content array: ${firstItem.toolCallId}, ${firstItem.toolName}`
                   );
-                  youtubeTranscriptsInContext += `\n\nYouTube Video Transcript:\n${firstItem.result}\n`;
+
+                  // If this is a YouTube video tool result, extract the transcript and add to context
+                  if (
+                    firstItem.toolName === 'getYoutubeVideoId' &&
+                    firstItem.result &&
+                    typeof firstItem.result === 'string' &&
+                    firstItem.result.includes('FULL TRANSCRIPT')
+                  ) {
+                    youtubeTranscriptCount++;
+
+                    // Limit number of transcripts to prevent timeout
+                    if (youtubeTranscriptCount <= MAX_YOUTUBE_TRANSCRIPTS) {
+                      let transcript = firstItem.result;
+
+                      // Truncate very long transcripts
+                      if (transcript.length > MAX_TRANSCRIPT_LENGTH) {
+                        transcript =
+                          transcript.substring(0, MAX_TRANSCRIPT_LENGTH) +
+                          `\n\n[Transcript truncated - original length: ${firstItem.result.length} chars]`;
+                        console.log(
+                          `[Chat API] Truncated YouTube transcript from ${firstItem.result.length} to ${transcript.length} chars`
+                        );
+                      }
+
+                      console.log(
+                        `[Chat API] Extracting YouTube transcript ${youtubeTranscriptCount} from tool result to add to context (${transcript.length} chars)`
+                      );
+                      youtubeTranscriptsInContext += `\n\nYouTube Video Transcript ${youtubeTranscriptCount}:\n${transcript}\n`;
+
+                      // Return the message (include it in finalCoreMessages)
+                      return {
+                        ...message,
+                        toolCallId: firstItem.toolCallId,
+                        toolName: firstItem.toolName,
+                      } as any;
+                    } else {
+                      console.log(
+                        `[Chat API] Skipping YouTube transcript ${youtubeTranscriptCount} - exceeded limit of ${MAX_YOUTUBE_TRANSCRIPTS} transcripts. Filtering out tool message.`
+                      );
+                      // Return null to filter out this message
+                      return null as any;
+                    }
+                  }
                 }
 
                 return {
@@ -545,17 +624,44 @@ export async function POST(req: NextRequest) {
                   toolName: firstItem.toolName,
                 } as any;
               }
-            }
 
-            return message;
-          });
+              return message;
+            })
+            .filter(
+              (message): message is NonNullable<typeof message> =>
+                message !== null
+            ); // Filter out null messages (exceeded limit)
 
           // Add YouTube transcripts to context string if found
           if (youtubeTranscriptsInContext) {
             contextString += youtubeTranscriptsInContext;
             console.log(
-              `[Chat API] Added YouTube transcript(s) to context string (${youtubeTranscriptsInContext.length} chars)`
+              `[Chat API] Added ${Math.min(
+                youtubeTranscriptCount,
+                MAX_YOUTUBE_TRANSCRIPTS
+              )} YouTube transcript(s) to context string (${
+                youtubeTranscriptsInContext.length
+              } chars)`
             );
+
+            if (youtubeTranscriptCount > MAX_YOUTUBE_TRANSCRIPTS) {
+              const skippedCount =
+                youtubeTranscriptCount - MAX_YOUTUBE_TRANSCRIPTS;
+              console.warn(
+                `[Chat API] WARNING: ${youtubeTranscriptCount} YouTube transcripts found, but only ${MAX_YOUTUBE_TRANSCRIPTS} added to context to prevent timeout`
+              );
+
+              // Send user-facing notification via data stream
+              dataStream.writeData(
+                JSON.stringify({
+                  type: 'notification',
+                  message: `⚠️ Processing limit: Only the first ${MAX_YOUTUBE_TRANSCRIPTS} YouTube videos will be processed in this request. ${skippedCount} additional video(s) were skipped to prevent timeout. Please make a separate request to process the remaining videos.`,
+                })
+              );
+
+              // Add notice to context so AI can also mention it naturally
+              contextString += `\n\n[IMPORTANT NOTICE: Due to processing limits, only the first ${MAX_YOUTUBE_TRANSCRIPTS} YouTube video transcripts were processed in this request. ${skippedCount} additional video(s) were skipped to prevent timeout. Please make a separate request to process the remaining videos.]`;
+            }
           }
 
           // Log tool messages to verify format
@@ -619,10 +725,21 @@ export async function POST(req: NextRequest) {
             });
           }
 
+          // Reduce maxSteps when context is very large to prevent timeout
+          const contextSize = contextString.length;
+          const isLargeContext = contextSize > 100000; // > 100KB
+          const adaptiveMaxSteps = isLargeContext ? 3 : 5;
+
+          if (isLargeContext) {
+            console.log(
+              `[Chat API] Large context detected (${contextSize} chars) - reducing maxSteps to ${adaptiveMaxSteps} to prevent timeout`
+            );
+          }
+
           const result = await streamText({
             model: getModel() as any,
             system: getChatSystemPrompt(contextString, currentDatetime),
-            maxSteps: 5,
+            maxSteps: adaptiveMaxSteps,
             messages: finalCoreMessages, // Use messages with extracted toolCallId/toolName
             tools: chatTools, // Regular tools, no web search
             onFinish: async ({ usage, sources }) => {
