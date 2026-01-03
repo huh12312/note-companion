@@ -1,4 +1,4 @@
-import { clerkClient } from "@clerk/nextjs/server";
+import { clerkClient } from '@clerk/nextjs/server';
 import { CustomerData } from '../../app/api/webhook/types';
 
 export async function updateClerkMetadata(data: CustomerData) {
