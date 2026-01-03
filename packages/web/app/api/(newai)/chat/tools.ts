@@ -169,17 +169,31 @@ export const chatTools = {
   },
   renameFiles: {
     description:
-      'Rename files intelligently based on content and organizational patterns',
+      'Rename files intelligently based on content and organizational patterns. Use this when the user asks to update, change, or rename a note title, filename, or file name. The note title in Obsidian is the filename (without .md extension). CRITICAL: When renaming the current file, infer the new name from context - if you just added an H1 heading (# Title) to the file, use that as the new filename. If the user says "rename the current note" without specifying a name, check the file content for the most prominent heading or title and use that. DO NOT ask the user for the new name - infer it from context and proceed automatically. CRITICAL FOR FILE PATH: When renaming the current/active file, you MUST extract the exact file path from the "Current File" section in the context. Look for "Path: <path>" in the Current File context and use that EXACT path. NEVER use placeholders like "current_note.md" - always use the actual path shown. IMPORTANT: The parameters structure is { files: [{ oldPath: string, newName: string }], message: string } - message is a top-level parameter, NOT inside the files array objects.',
     parameters: z.object({
-      files: z.array(
-        z.object({
-          oldPath: z.string().describe('Current full path of the file'),
-          newName: z
-            .string()
-            .describe('Descriptive new file name based on content'),
-        })
-      ),
-      message: z.string().describe('Clear explanation of the naming strategy'),
+      files: z
+        .array(
+          z.object({
+            oldPath: z
+              .string()
+              .describe(
+                'Current full path of the file (e.g., "folder/note.md"). CRITICAL: For the current/active file, you MUST extract the exact path from the "Current File" section in the context. Look for "Path: <path>" in the Current File context. NEVER use placeholders like "current_note.md" or "Untitled.md" - always use the actual path shown in the context. If the Current File context shows "Path: Untitled.md", use exactly "Untitled.md" (not "current_note.md").'
+              ),
+            newName: z
+              .string()
+              .describe(
+                'New file name without .md extension (e.g., "My New Note Title"). Infer this from context: if you just added an H1 heading, use that text. If the file has a prominent heading, use that. Sanitize the name (remove special characters, keep it file-system safe). The .md extension will be added automatically. IMPORTANT: This object only contains oldPath and newName fields - do NOT include message here.'
+              ),
+          })
+        )
+        .describe(
+          'Array of file objects to rename. Each object contains only oldPath and newName - no other fields.'
+        ),
+      message: z
+        .string()
+        .describe(
+          'Clear explanation of the naming strategy and how the new name was inferred. This is a SEPARATE top-level parameter, NOT inside the files array objects.'
+        ),
     }),
   },
   executeActionsOnFileBasedOnPrompt: {

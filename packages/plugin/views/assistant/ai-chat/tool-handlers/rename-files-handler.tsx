@@ -1,13 +1,15 @@
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
 import { TFile } from "obsidian";
 import { ToolHandlerProps } from "./types";
 import { usePlugin } from "../../provider";
+import { sanitizeFileName } from "../../../../someUtils";
 
 export function RenameFilesHandler({ toolInvocation, handleAddResult, app }: ToolHandlerProps) {
   const plugin = usePlugin();
   const [isDone, setIsDone] = useState(false);
   const [results, setResults] = useState<string[]>([]);
   const [filesToRename, setFilesToRename] = useState<Array<{oldPath: string; newName: string}>>([]);
+  const hasExecutedRef = useRef(false);
 
   React.useEffect(() => {
     if (!isDone && !filesToRename.length) {
@@ -16,7 +18,7 @@ export function RenameFilesHandler({ toolInvocation, handleAddResult, app }: Too
     }
   }, [toolInvocation.args, isDone]);
 
-  const handleRename = async () => {
+  const handleRename = React.useCallback(async () => {
     const { files } = toolInvocation.args;
     const renameResults: string[] = [];
 
@@ -24,21 +26,45 @@ export function RenameFilesHandler({ toolInvocation, handleAddResult, app }: Too
       try {
         const existingFile = plugin.app.vault.getAbstractFileByPath(fileData.oldPath);
         if (existingFile && existingFile instanceof TFile) {
-          const newPath = existingFile.path.replace(existingFile.name, fileData.newName);
+          // Remove .md extension if present (tool description says it will be added automatically)
+          let newName = fileData.newName;
+          if (newName.endsWith('.md')) {
+            newName = newName.slice(0, -3);
+          }
+
+          // Sanitize the filename to remove invalid characters
+          newName = sanitizeFileName(newName);
+
+          // Build new path: replace just the filename part, keeping the folder structure
+          const folderPath = existingFile.parent?.path || '';
+          const newPath = folderPath ? `${folderPath}/${newName}.md` : `${newName}.md`;
+
           await plugin.app.fileManager.renameFile(existingFile, newPath);
           renameResults.push(`✅ Renamed: ${existingFile.path} → ${newPath}`);
         } else {
           renameResults.push(`❌ Could not find file: ${fileData.oldPath}`);
         }
       } catch (error) {
-        renameResults.push(`❌ Error: ${error.message}`);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        renameResults.push(`❌ Error: ${errorMessage}`);
       }
     }
 
     setResults(renameResults);
     setIsDone(true);
     handleAddResult(JSON.stringify({ success: true, results: renameResults }));
-  };
+  }, [toolInvocation.args, plugin.app, handleAddResult]);
+
+  // Auto-execute for single file renames (especially current file)
+  React.useEffect(() => {
+    if (!hasExecutedRef.current && !isDone && filesToRename.length === 1 && !("result" in toolInvocation)) {
+      hasExecutedRef.current = true;
+      // Small delay to ensure UI is ready
+      setTimeout(() => {
+        handleRename();
+      }, 100);
+    }
+  }, [filesToRename.length, isDone, toolInvocation, handleRename]);
 
   return (
     <div className="flex flex-col space-y-4 p-4 border border-[--background-modifier-border]">
@@ -63,11 +89,11 @@ export function RenameFilesHandler({ toolInvocation, handleAddResult, app }: Too
       {results.length > 0 && (
         <div className="text-sm space-y-1">
           {results.map((result, i) => (
-            <div 
+            <div
               key={i}
               className={`${
-                result.startsWith("✅") 
-                  ? "text-[--text-success]" 
+                result.startsWith("✅")
+                  ? "text-[--text-success]"
                   : "text-[--text-error]"
               }`}
             >
