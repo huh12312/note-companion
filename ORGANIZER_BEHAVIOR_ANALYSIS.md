@@ -1,7 +1,7 @@
 # ORGANIZER BEHAVIOR ANALYSIS
 
-**Date:** November 22, 2025  
-**Version:** 1.0  
+**Date:** November 22, 2025
+**Version:** 1.0
 **Scope:** Complete analysis of Note Companion's file organization pipeline
 
 ---
@@ -11,6 +11,7 @@
 Note Companion is a sophisticated document transcription and organization system that automates the processing of files dropped into an inbox folder. The system follows a multi-step pipeline that extracts content, classifies documents, recommends names/folders/tags, and formats content according to templates.
 
 ### Key Strengths
+
 - **Well-architected pipeline** with clear separation of concerns
 - **Robust error handling** with detailed record tracking
 - **Smart concurrency management** for media vs. non-media files
@@ -18,6 +19,7 @@ Note Companion is a sophisticated document transcription and organization system
 - **Comprehensive logging** via RecordManager
 
 ### Critical Pain Points
+
 1. **Zero user visibility** during processing (no progress indicators)
 2. **Silent failures** with files moved to error/bypass folders
 3. **No undo/rollback** mechanism for automated decisions
@@ -25,6 +27,7 @@ Note Companion is a sophisticated document transcription and organization system
 5. **Unclear processing status** - users don't know what's happening when
 
 ### Impact Assessment
+
 - **Severity: HIGH** - Core UX issues affect every user interaction
 - **Scope: WIDE** - Issues span from inbox to organizer sidebar
 - **User Frustration: SIGNIFICANT** - "Black box" processing creates anxiety
@@ -80,7 +83,7 @@ sequenceDiagram
     participant EH as Event Handler
     participant IQ as Inbox Queue
     participant RM as Record Manager
-    
+
     U->>FS: Drop file in inbox
     FS->>EH: onCreate/onRename event
     Note over EH: Wait 1 second
@@ -94,6 +97,7 @@ sequenceDiagram
 **Code Location:** `packages/plugin/handlers/eventHandlers.ts:5-30`
 
 **Current Issues:**
+
 - ❌ 1-second hardcoded delay creates perception of lag
 - ❌ No user notification about queuing
 - ❌ No indication of queue position
@@ -144,25 +148,26 @@ graph TD
 
 #### Step Details
 
-| Step | Action | Settings Gate | Can Skip? | Error Handling |
-|------|--------|--------------|-----------|----------------|
-| 1 | Start Processing | - | No | Move to error folder |
-| 2 | Validate File | - | No | Move to bypass folder |
-| 3 | Create Container | - | No (media only) | Move to error folder |
-| 4 | Move Attachment | - | No (media only) | ERROR_MOVING_ATTACHMENT |
-| 5 | Extract Content | - | No | ERROR_EXTRACT |
-| 6 | Cleanup/Sanitize | - | No | Move to bypass if too short |
-| 7 | Check YouTube URL | - | Yes | Continue on error |
-| 8 | Fetch YouTube Data | - | Yes | Log error, continue |
-| 9 | Classify Document | `enableDocumentClassification` | Yes | ERROR_CLASSIFY |
-| 10 | Recommend Folder | - | No | ERROR_MOVING |
-| 11 | Recommend Name | `enableFileRenaming` | Yes | ERROR_RENAME |
-| 12 | Format Content | `enableDocumentClassification` | Yes | ERROR_FORMATTING |
-| 13 | Append Attachment | - | No (media only) | ERROR_APPEND |
-| 14 | Recommend Tags | `useSimilarTags` | Yes | ERROR_TAGGING |
-| 15 | Complete | - | No | ERROR_COMPLETE |
+| Step | Action             | Settings Gate                  | Can Skip?       | Error Handling              |
+| ---- | ------------------ | ------------------------------ | --------------- | --------------------------- |
+| 1    | Start Processing   | -                              | No              | Move to error folder        |
+| 2    | Validate File      | -                              | No              | Move to bypass folder       |
+| 3    | Create Container   | -                              | No (media only) | Move to error folder        |
+| 4    | Move Attachment    | -                              | No (media only) | ERROR_MOVING_ATTACHMENT     |
+| 5    | Extract Content    | -                              | No              | ERROR_EXTRACT               |
+| 6    | Cleanup/Sanitize   | -                              | No              | Move to bypass if too short |
+| 7    | Check YouTube URL  | -                              | Yes             | Continue on error           |
+| 8    | Fetch YouTube Data | -                              | Yes             | Log error, continue         |
+| 9    | Classify Document  | `enableDocumentClassification` | Yes             | ERROR_CLASSIFY              |
+| 10   | Recommend Folder   | -                              | No              | ERROR_MOVING                |
+| 11   | Recommend Name     | `enableFileRenaming`           | Yes             | ERROR_RENAME                |
+| 12   | Format Content     | `enableDocumentClassification` | Yes             | ERROR_FORMATTING            |
+| 13   | Append Attachment  | -                              | No (media only) | ERROR_APPEND                |
+| 14   | Recommend Tags     | `useSimilarTags`               | Yes             | ERROR_TAGGING               |
+| 15   | Complete           | -                              | No              | ERROR_COMPLETE              |
 
 **Code Locations:**
+
 - Main pipeline: `packages/plugin/inbox/index.ts:299-412`
 - Individual steps: `packages/plugin/inbox/index.ts:414-811`
 
@@ -174,17 +179,17 @@ Every processing step is logged in the RecordManager with:
 
 ```typescript
 interface FileRecord {
-  id: string;                    // File hash
-  tags: string[];                // Applied tags
-  classification?: string;       // Document type
-  formatted: boolean;            // Was formatting applied?
-  newPath?: string;             // Destination folder
-  newName?: string;             // New filename
-  originalName: string;         // Original filename
+  id: string; // File hash
+  tags: string[]; // Applied tags
+  classification?: string; // Document type
+  formatted: boolean; // Was formatting applied?
+  newPath?: string; // Destination folder
+  newName?: string; // New filename
+  originalName: string; // Original filename
   logs: Record<Action, LogEntry>; // Step-by-step log
-  status: FileStatus;           // queued/processing/completed/error/bypassed
-  file: TFile | null;          // File reference
-  folder?: string;             // Current folder
+  status: FileStatus; // queued/processing/completed/error/bypassed
+  file: TFile | null; // File reference
+  folder?: string; // Current folder
 }
 
 interface LogEntry {
@@ -202,6 +207,7 @@ interface LogEntry {
 **Code Location:** `packages/plugin/inbox/services/record-manager.ts:74-86`
 
 **Record Persistence:**
+
 - Saved to `_NoteCompanion/.records` as JSON
 - Debounced writes (1 second delay)
 - Survives plugin reload
@@ -272,22 +278,58 @@ journey
 
 ### Critical Issues (Severity: 🔴 HIGH)
 
-#### 1. **Zero Processing Visibility**
+#### 1. **Zero Processing Visibility** - ✅ PARTIALLY ADDRESSED
 
 **Problem:** Users have no idea what's happening after dropping a file.
 
+**Current Status (2026-01-03):**
+
+- ✅ **Toast Notifications:** Implemented via `enableProcessingNotifications` setting (default: true)
+  - Shows notifications for key steps: EXTRACT, CLASSIFY, MOVING, RENAME, TAGGING, FORMATTING
+  - Location: `packages/plugin/inbox/index.ts:972-993`
+- ✅ **Inbox Logs UI:** Full UI component available with:
+  - Status badges (queued, processing, completed, error, bypassed)
+  - Processing timeline showing step-by-step progress
+  - Analytics dashboard with counts by status
+  - File cards with status indicators and expandable details
+  - Location: `packages/plugin/views/assistant/inbox-logs.tsx`
+- ✅ **Processing Timeline:** Visual timeline component showing:
+  - Each processing step with status (completed, processing, error, pending)
+  - Timestamps for each step
+  - Duration information
+  - Location: `packages/plugin/views/assistant/organizer/components/processing-timeline.tsx`
+
+**Remaining Issues:**
+
+- ⚠️ **Visibility Requires Action:** Inbox logs UI requires opening the "Inbox" tab in Assistant view
+- ⚠️ **No Immediate Feedback:** Toast notifications may not be visible if user navigates away
+- ⚠️ **Queue Position Unknown:** Users still don't see their position in the queue
+
 **Evidence:**
-- No progress bar or status indicator
-- Files silently moved between folders
-- Processing time varies (5s for text, 60s+ for PDFs)
-- Queue position unknown
+
+- Toast notifications implemented but may be missed
+- Full UI exists but requires opening Inbox tab
+- Processing time still varies (5s for text, 60s+ for PDFs)
+- Queue position not displayed
 
 **Impact:**
-- User anxiety ("Did it work?")
-- Duplicate submissions (users re-upload thinking it failed)
-- Support tickets ("Where did my file go?")
 
-**Location:** Inbox system lacks any UI feedback mechanism
+- ✅ Reduced user anxiety (toast notifications help)
+- ⚠️ Still some confusion if notifications are missed
+- ⚠️ Users may not know to open Inbox tab for full visibility
+
+**Location:**
+
+- Toast notifications: `packages/plugin/inbox/index.ts:972-993`
+- Inbox UI: `packages/plugin/views/assistant/inbox-logs.tsx`
+- Processing timeline: `packages/plugin/views/assistant/organizer/components/processing-timeline.tsx`
+
+**Recommendations:**
+
+- Consider auto-opening Inbox tab when processing starts
+- Add persistent notification/indicator in status bar
+- Show queue position in toast notifications
+- Add progress percentage for long-running operations
 
 ---
 
@@ -296,27 +338,31 @@ journey
 **Problem:** Files moved to error/bypass folders without explanation.
 
 **Evidence:**
+
 ```typescript
 // From inbox/index.ts:669-688
 async function handleBypass(context, reason) {
   // Silently moves file to _NoteCompanion/Bypassed
   await safeMove(context.plugin.app, context.inboxFile, bypassedFolderPath);
-  context.recordManager.setStatus(context.hash, "bypassed");
-  throw new Error("Bypassed due to " + reason);
+  context.recordManager.setStatus(context.hash, 'bypassed');
+  throw new Error('Bypassed due to ' + reason);
 }
 ```
 
 **Bypass Triggers:**
+
 - Unsupported file type
 - Content less than 5 characters
 - Invalid extension
 
 **Error Triggers:**
+
 - Classification API failure
 - File system permission errors
 - Network timeouts
 
 **Impact:**
+
 - Users lose files without knowing why
 - No actionable feedback
 - Hidden files in technical folders
@@ -328,12 +374,14 @@ async function handleBypass(context, reason) {
 **Problem:** Automated changes can't be reversed.
 
 **Evidence:**
+
 - Tags automatically appended (no undo)
 - Files automatically renamed (no undo)
 - Files automatically moved (no undo)
 - Formatting applied destructively (backup exists but hidden)
 
 **Backup System Exists But:**
+
 ```typescript
 // From index.ts:1149-1158
 async backupTheFileAndAddReferenceToCurrentFile(file: TFile) {
@@ -343,11 +391,13 @@ async backupTheFileAndAddReferenceToCurrentFile(file: TFile) {
   return backupFile;
 }
 ```
+
 - Stored in `_NoteCompanion/Backups/`
 - Link appended to formatted file
 - **Not discoverable or actionable from UI**
 
 **Impact:**
+
 - Fear of using automation
 - Manual corrections required
 - User trust erosion
@@ -361,6 +411,7 @@ async backupTheFileAndAddReferenceToCurrentFile(file: TFile) {
 **Problem:** 20+ settings scattered across settings page.
 
 **Settings Categories:**
+
 ```
 Paths (8 settings)
 ├── Inbox Path
@@ -390,6 +441,7 @@ Advanced (6 settings)
 ```
 
 **Impact:**
+
 - Overwhelming for new users
 - Unclear dependencies (e.g., classification gates formatting)
 - Trial-and-error configuration
@@ -401,24 +453,27 @@ Advanced (6 settings)
 **Problem:** Generic error actions don't explain root cause.
 
 **Current Error Actions:**
+
 ```typescript
 enum Action {
-  ERROR_CLEANUP = "Failed to clean up file",
-  ERROR_RENAME = "Failed to rename file",
-  ERROR_EXTRACT = "Failed to extract content",
-  ERROR_CLASSIFY = "Failed to analyze document type",
-  ERROR_TAGGING = "Failed to generate tags",
-  ERROR_FORMATTING = "Failed to format content",
-  ERROR_MOVING = "Failed to move file",
+  ERROR_CLEANUP = 'Failed to clean up file',
+  ERROR_RENAME = 'Failed to rename file',
+  ERROR_EXTRACT = 'Failed to extract content',
+  ERROR_CLASSIFY = 'Failed to analyze document type',
+  ERROR_TAGGING = 'Failed to generate tags',
+  ERROR_FORMATTING = 'Failed to format content',
+  ERROR_MOVING = 'Failed to move file',
 }
 ```
 
 **Missing Context:**
+
 - Why did classification fail? (Rate limit? Invalid API key? Network error?)
 - What was the expected folder? (Why did move fail?)
 - What characters caused rename failure?
 
 **Impact:**
+
 - Users can't self-diagnose
 - Support burden increases
 - Workarounds not obvious
@@ -430,12 +485,14 @@ enum Action {
 **Problem:** Can't process multiple files with same settings.
 
 **Evidence:**
+
 - Queue processes files one-by-one
 - Each file makes separate API calls
 - No "apply to all" option
 - No bulk tag/folder assignment
 
 **Impact:**
+
 - Slow processing of large batches
 - Repetitive clicking for similar files
 - Higher API costs
@@ -449,23 +506,26 @@ enum Action {
 **Problem:** Users forced to manually refresh to see updates.
 
 **Evidence:**
+
 ```typescript
 // From organizer.tsx:99-111
 const refreshContext = React.useCallback(() => {
-  setRefreshKey(prevKey => prevKey + 1);
+  setRefreshKey((prevKey) => prevKey + 1);
   setError(null);
   setActiveFile(null);
-  setNoteContent("");
+  setNoteContent('');
   setTimeout(() => updateActiveFile(), 50);
 }, [updateActiveFile]);
 ```
 
 **Why Needed:**
+
 - Stale AI suggestions
 - Cached file content
 - No auto-refresh on changes
 
 **Impact:**
+
 - Extra clicks required
 - Unclear when refresh needed
 - "Is this fresh?" uncertainty
@@ -477,17 +537,19 @@ const refreshContext = React.useCallback(() => {
 **Problem:** Tag confidence scores visible in tooltip but not actionable.
 
 **Evidence:**
+
 ```typescript
 // From tags.tsx:96-114
 <ExistingTagButton
   folder={sanitizeTag(tag.tag)}
   onClick={handleTagClick}
-  score={tag.score}  // Only in tooltip!
+  score={tag.score} // Only in tooltip!
   reason={tag.reason} // Only in tooltip!
 />
 ```
 
 **Impact:**
+
 - Users can't filter by confidence
 - No threshold control in UI
 - Blind trust in low-score tags
@@ -499,6 +561,7 @@ const refreshContext = React.useCallback(() => {
 **Problem:** Loading skeletons don't reflect actual processing time.
 
 **Evidence:**
+
 ```typescript
 // From skeleton-loader.tsx:22-32
 <motion.div
@@ -512,6 +575,7 @@ const refreshContext = React.useCallback(() => {
 ```
 
 **Impact:**
+
 - False expectation (PDF might take 30s, skeleton loops forever)
 - No time estimate
 - Anxious waiting
@@ -523,6 +587,7 @@ const refreshContext = React.useCallback(() => {
 **Problem:** Multiple empty states with similar messaging.
 
 **Cases:**
+
 - No file open
 - File in ignored folder
 - Media file (use inbox instead)
@@ -531,6 +596,7 @@ const refreshContext = React.useCallback(() => {
 - Error state
 
 **Impact:**
+
 - Visual clutter
 - Unclear next action
 - Repetitive messaging
@@ -546,18 +612,19 @@ const refreshContext = React.useCallback(() => {
 **Scope:** Show step-by-step progress toasts during inbox processing.
 
 **Implementation:**
+
 ```typescript
 // In inbox/index.ts executeStep function
 async function executeStep(context, step, action, errorAction) {
   try {
     // BEFORE executing step
     new Notice(`📄 ${context.inboxFile.basename}: ${action}`, 3000);
-    
+
     const result = await step(context);
-    
+
     // AFTER completing step
     new Notice(`✅ ${context.inboxFile.basename}: ${action} completed`, 2000);
-    
+
     return result;
   } catch (error) {
     new Notice(`❌ ${context.inboxFile.basename}: ${errorAction}`, 5000);
@@ -567,6 +634,7 @@ async function executeStep(context, step, action, errorAction) {
 ```
 
 **Benefits:**
+
 - Immediate user feedback
 - Clear progress indication
 - Error visibility
@@ -580,11 +648,12 @@ async function executeStep(context, step, action, errorAction) {
 **Scope:** Add a "Recent Issues" section to dashboard showing bypassed/error files.
 
 **Implementation:**
+
 ```typescript
 // New component: RecentIssuesPanel
 export const RecentIssuesPanel = ({ plugin }) => {
   const records = RecordManager.getInstance().getAllRecords();
-  const issues = records.filter(r => 
+  const issues = records.filter(r =>
     r.status === 'bypassed' || r.status === 'error'
   ).slice(0, 10); // Last 10 issues
 
@@ -607,6 +676,7 @@ export const RecentIssuesPanel = ({ plugin }) => {
 ```
 
 **Benefits:**
+
 - Surfaces hidden failures
 - Actionable retry mechanism
 - Learning opportunity for users
@@ -620,6 +690,7 @@ export const RecentIssuesPanel = ({ plugin }) => {
 **Scope:** Visually indicate AI confidence with color-coded badges.
 
 **Implementation:**
+
 ```typescript
 // In suggestion-buttons.tsx
 const getConfidenceBadge = (score: number) => {
@@ -630,11 +701,13 @@ const getConfidenceBadge = (score: number) => {
 
 export const ExistingFolderButton = ({ folder, score, reason }) => {
   const badge = getConfidenceBadge(score);
-  
+
   return (
     <button className="relative">
       {folder}
-      <span className={`absolute top-0 right-0 ${badge.color} text-xs px-1 rounded`}>
+      <span
+        className={`absolute top-0 right-0 ${badge.color} text-xs px-1 rounded`}
+      >
         {badge.text}
       </span>
     </button>
@@ -643,6 +716,7 @@ export const ExistingFolderButton = ({ folder, score, reason }) => {
 ```
 
 **Benefits:**
+
 - Visual quality indicator
 - Helps prioritize choices
 - Builds trust in high-confidence suggestions
@@ -656,6 +730,7 @@ export const ExistingFolderButton = ({ folder, score, reason }) => {
 **Scope:** Explain current processing step in real-time.
 
 **Implementation:**
+
 ```typescript
 // Add to inbox queue status
 export const QueueStatusIndicator = () => {
@@ -667,14 +742,14 @@ export const QueueStatusIndicator = () => {
     const interval = setInterval(() => {
       const processing = RecordManager.getInstance()
         .getAllRecords()
-        .find(r => r.status === 'processing');
-      
+        .find((r) => r.status === 'processing');
+
       if (processing) {
         setCurrentFile(processing.originalName);
         setCurrentAction(processing.getLastStep());
       }
     }, 500);
-    
+
     return () => clearInterval(interval);
   }, []);
 
@@ -683,13 +758,16 @@ export const QueueStatusIndicator = () => {
   return (
     <div className="queue-status-tooltip">
       <span className="animate-spin">⟳</span>
-      <span>{currentFile}: {currentAction}</span>
+      <span>
+        {currentFile}: {currentAction}
+      </span>
     </div>
   );
 };
 ```
 
 **Benefits:**
+
 - Real-time transparency
 - Reduces anxiety
 - Sets expectations
@@ -705,6 +783,7 @@ export const QueueStatusIndicator = () => {
 **Scope:** Track all automated changes and allow reverting within session.
 
 **Architecture:**
+
 ```typescript
 interface UndoableAction {
   id: string;
@@ -763,6 +842,7 @@ class UndoManager {
 ```
 
 **UI Component:**
+
 ```typescript
 export const UndoPanel = () => {
   const recentActions = UndoManager.getInstance().getRecentActions();
@@ -770,9 +850,11 @@ export const UndoPanel = () => {
   return (
     <div className="undo-panel">
       <h3>Recent Changes</h3>
-      {recentActions.map(action => (
+      {recentActions.map((action) => (
         <div key={action.id} className="undo-item">
-          <span>{action.type}: {action.file.basename}</span>
+          <span>
+            {action.type}: {action.file.basename}
+          </span>
           <button onClick={() => UndoManager.getInstance().undo()}>
             ⟲ Undo
           </button>
@@ -784,6 +866,7 @@ export const UndoPanel = () => {
 ```
 
 **Benefits:**
+
 - Safety net for automation
 - Builds user confidence
 - Learn from mistakes
@@ -797,6 +880,7 @@ export const UndoPanel = () => {
 **Scope:** Reorganize settings into beginner/advanced tabs.
 
 **Structure:**
+
 ```
 Settings Tabs
 ├── Getting Started
@@ -826,6 +910,7 @@ Settings Tabs
 ```
 
 **Implementation:**
+
 ```typescript
 export class FileOrganizerSettingTab extends PluginSettingTab {
   display(): void {
@@ -835,10 +920,10 @@ export class FileOrganizerSettingTab extends PluginSettingTab {
     // Tab navigation
     const tabs = containerEl.createDiv('settings-tabs');
     const tabButtons = ['Getting Started', 'Processing', 'Folders', 'Advanced'];
-    
+
     let activeTab = 'Getting Started';
-    
-    tabButtons.forEach(tab => {
+
+    tabButtons.forEach((tab) => {
       const btn = tabs.createEl('button', { text: tab });
       btn.onclick = () => {
         activeTab = tab;
@@ -856,6 +941,7 @@ export class FileOrganizerSettingTab extends PluginSettingTab {
 ```
 
 **Benefits:**
+
 - Reduced overwhelm for new users
 - Logical grouping
 - Discoverability of advanced features
@@ -869,6 +955,7 @@ export class FileOrganizerSettingTab extends PluginSettingTab {
 **Scope:** Show detailed processing history with timing information.
 
 **UI Design:**
+
 ```
 ┌─────────────────────────────────────────┐
 │ Processing Timeline: my-document.pdf    │
@@ -895,6 +982,7 @@ export class FileOrganizerSettingTab extends PluginSettingTab {
 ```
 
 **Implementation:**
+
 ```typescript
 export const ProcessingTimeline = ({ fileHash }) => {
   const record = RecordManager.getInstance().getRecord(fileHash);
@@ -913,7 +1001,7 @@ export const ProcessingTimeline = ({ fileHash }) => {
     <div className="timeline">
       {steps.map((step, index) => {
         const nextStep = steps[index + 1];
-        const duration = nextStep 
+        const duration = nextStep
           ? nextStep.timestamp.diff(step.timestamp, 'seconds', true)
           : 0;
 
@@ -938,6 +1026,7 @@ export const ProcessingTimeline = ({ fileHash }) => {
 ```
 
 **Benefits:**
+
 - Performance transparency
 - Debugging aid
 - Understanding bottlenecks
@@ -951,6 +1040,7 @@ export const ProcessingTimeline = ({ fileHash }) => {
 **Scope:** Allow processing multiple files with same settings.
 
 **UI Design:**
+
 ```
 ┌─────────────────────────────────────────┐
 │ Batch Process (5 files selected)        │
@@ -971,6 +1061,7 @@ export const ProcessingTimeline = ({ fileHash }) => {
 ```
 
 **Implementation:**
+
 ```typescript
 export const BatchProcessor = () => {
   const [selectedFiles, setSelectedFiles] = useState<TFile[]>([]);
@@ -1008,6 +1099,7 @@ export const BatchProcessor = () => {
 ```
 
 **Benefits:**
+
 - Massive time savings
 - Consistent organization
 - Reduced API calls (batch classify)
@@ -1021,6 +1113,7 @@ export const BatchProcessor = () => {
 **Scope:** Automatically retry failed steps with exponential backoff.
 
 **Implementation:**
+
 ```typescript
 class RetryManager {
   private retries = new Map<string, number>();
@@ -1041,14 +1134,16 @@ class RetryManager {
       if (retryCount < this.maxRetries) {
         // Exponential backoff: 2^retryCount seconds
         const delay = Math.pow(2, retryCount) * 1000;
-        
+
         new Notice(
-          `⟳ ${action} failed. Retrying in ${delay/1000}s... (${retryCount + 1}/${this.maxRetries})`,
+          `⟳ ${action} failed. Retrying in ${delay / 1000}s... (${
+            retryCount + 1
+          }/${this.maxRetries})`,
           delay
         );
 
-        await new Promise(resolve => setTimeout(resolve, delay));
-        
+        await new Promise((resolve) => setTimeout(resolve, delay));
+
         this.retries.set(fileHash, retryCount + 1);
         return this.executeWithRetry(fn, fileHash, action);
       } else {
@@ -1062,7 +1157,7 @@ class RetryManager {
 // Usage in executeStep
 async function executeStep(context, step, action, errorAction) {
   const retryManager = RetryManager.getInstance();
-  
+
   return retryManager.executeWithRetry(
     () => step(context),
     context.hash,
@@ -1072,6 +1167,7 @@ async function executeStep(context, step, action, errorAction) {
 ```
 
 **Benefits:**
+
 - Resilience to transient failures (network, rate limits)
 - Reduces error folder clutter
 - Better success rate
@@ -1087,10 +1183,14 @@ async function executeStep(context, step, action, errorAction) {
 **Scope:** Dedicated view showing live queue status, processing files, and completion stats.
 
 **Architecture:**
+
 ```typescript
 // Real-time event bus
 class ProcessingEventBus extends EventEmitter {
-  emit(event: 'queue-updated' | 'file-processing' | 'file-completed', data: any) {
+  emit(
+    event: 'queue-updated' | 'file-processing' | 'file-completed',
+    data: any
+  ) {
     super.emit(event, data);
   }
 }
@@ -1099,7 +1199,7 @@ class ProcessingEventBus extends EventEmitter {
 export class Queue<T> extends EventEmitter {
   private async processNext() {
     // ... existing code ...
-    
+
     ProcessingEventBus.getInstance().emit('file-processing', {
       hash: item.hash,
       filename: item.data.basename,
@@ -1129,14 +1229,14 @@ export const ProcessingDashboard = () => {
     });
 
     bus.on('file-processing', ({ filename }) => {
-      setActiveFiles(prev => [...prev, filename]);
+      setActiveFiles((prev) => [...prev, filename]);
     });
 
     bus.on('file-completed', ({ filename, status }) => {
-      setActiveFiles(prev => prev.filter(f => f !== filename));
-      setRecentCompletions(prev => [
+      setActiveFiles((prev) => prev.filter((f) => f !== filename));
+      setRecentCompletions((prev) => [
         { filename, status, timestamp: Date.now() },
-        ...prev.slice(0, 9)
+        ...prev.slice(0, 9),
       ]);
     });
 
@@ -1148,31 +1248,15 @@ export const ProcessingDashboard = () => {
   return (
     <div className="processing-dashboard">
       <div className="stats-grid">
-        <StatCard 
-          label="In Queue" 
-          value={queueStats?.queued} 
-          icon="📥"
-        />
-        <StatCard 
-          label="Processing" 
-          value={queueStats?.processing} 
-          icon="⚙️"
-        />
-        <StatCard 
-          label="Completed" 
-          value={queueStats?.completed} 
-          icon="✅"
-        />
-        <StatCard 
-          label="Errors" 
-          value={queueStats?.errors} 
-          icon="❌"
-        />
+        <StatCard label="In Queue" value={queueStats?.queued} icon="📥" />
+        <StatCard label="Processing" value={queueStats?.processing} icon="⚙️" />
+        <StatCard label="Completed" value={queueStats?.completed} icon="✅" />
+        <StatCard label="Errors" value={queueStats?.errors} icon="❌" />
       </div>
 
       <div className="active-processing">
         <h3>Currently Processing</h3>
-        {activeFiles.map(filename => (
+        {activeFiles.map((filename) => (
           <div key={filename} className="active-file">
             <span className="animate-spin">⟳</span>
             <span>{filename}</span>
@@ -1196,11 +1280,13 @@ export const ProcessingDashboard = () => {
 ```
 
 **Benefits:**
+
 - Real-time transparency
 - Queue management visibility
 - Performance insights
 
-**Code Location:** 
+**Code Location:**
+
 - Event bus: `packages/plugin/services/event-bus.ts`
 - Dashboard: `packages/plugin/views/assistant/dashboard/processing-view.tsx`
 
@@ -1211,28 +1297,32 @@ export const ProcessingDashboard = () => {
 **Scope:** Learn user preferences over time and auto-apply.
 
 **Architecture:**
+
 ```typescript
 interface UserPreference {
-  pattern: string;           // File pattern (e.g., "*.pdf", "meeting-*")
-  classification?: string;   // Preferred classification
-  folder?: string;          // Preferred destination
-  tags?: string[];          // Preferred tags
-  template?: string;        // Preferred template
-  confidence: number;       // Learning confidence (0-100)
-  appliedCount: number;     // Times user confirmed this preference
-  rejectedCount: number;    // Times user rejected this preference
+  pattern: string; // File pattern (e.g., "*.pdf", "meeting-*")
+  classification?: string; // Preferred classification
+  folder?: string; // Preferred destination
+  tags?: string[]; // Preferred tags
+  template?: string; // Preferred template
+  confidence: number; // Learning confidence (0-100)
+  appliedCount: number; // Times user confirmed this preference
+  rejectedCount: number; // Times user rejected this preference
 }
 
 class PreferenceLearner {
   private preferences: Map<string, UserPreference> = new Map();
 
-  learnFromAction(file: TFile, action: {
-    type: 'folder' | 'tag' | 'classification' | 'template';
-    value: any;
-  }) {
+  learnFromAction(
+    file: TFile,
+    action: {
+      type: 'folder' | 'tag' | 'classification' | 'template';
+      value: any;
+    }
+  ) {
     const pattern = this.detectPattern(file);
     const key = `${pattern}_${action.type}`;
-    
+
     const existing = this.preferences.get(key);
     if (existing && existing.value === action.value) {
       // User confirmed this preference
@@ -1250,7 +1340,10 @@ class PreferenceLearner {
     }
   }
 
-  getRecommendation(file: TFile, type: 'folder' | 'tag' | 'classification' | 'template') {
+  getRecommendation(
+    file: TFile,
+    type: 'folder' | 'tag' | 'classification' | 'template'
+  ) {
     const pattern = this.detectPattern(file);
     const key = `${pattern}_${type}`;
     const pref = this.preferences.get(key);
@@ -1286,7 +1379,7 @@ async function recommendFolderStep(context: ProcessingContext) {
     // Auto-apply high-confidence preference
     context.newPath = learned.value;
     await safeMove(context.plugin.app, context.containerFile, context.newPath);
-    
+
     new Notice(
       `📂 Auto-moved to ${learned.value} (${learned.confidence}% confidence)`,
       3000
@@ -1305,6 +1398,7 @@ async function recommendFolderStep(context: ProcessingContext) {
 ```
 
 **Benefits:**
+
 - Reduced clicks over time
 - Personalized automation
 - Faster processing (fewer API calls)
@@ -1318,6 +1412,7 @@ async function recommendFolderStep(context: ProcessingContext) {
 **Scope:** Pause before final commit, show preview, allow edits.
 
 **UI Flow:**
+
 ```
 ┌─────────────────────────────────────────┐
 │ Review Changes: my-document.pdf         │
@@ -1343,6 +1438,7 @@ async function recommendFolderStep(context: ProcessingContext) {
 ```
 
 **Implementation:**
+
 ```typescript
 interface ProcessingPreview {
   fileHash: string;
@@ -1376,12 +1472,16 @@ async function completeProcessing(context: ProcessingContext) {
     }
   }
 
-  context.recordManager.setStatus(context.hash, "completed");
+  context.recordManager.setStatus(context.hash, 'completed');
   return context;
 }
 
 class ReviewModal extends Modal {
-  constructor(app: App, preview: ProcessingPreview, onComplete: (result) => void) {
+  constructor(
+    app: App,
+    preview: ProcessingPreview,
+    onComplete: (result) => void
+  ) {
     super(app);
     this.preview = preview;
     this.onComplete = onComplete;
@@ -1398,13 +1498,11 @@ class ReviewModal extends Modal {
 
     // Action buttons
     const actions = contentEl.createDiv('modal-actions');
-    
-    new ButtonComponent(actions)
-      .setButtonText('Approve All')
-      .onClick(() => {
-        this.onComplete({ approved: true, learnPreferences: false });
-        this.close();
-      });
+
+    new ButtonComponent(actions).setButtonText('Approve All').onClick(() => {
+      this.onComplete({ approved: true, learnPreferences: false });
+      this.close();
+    });
 
     new ButtonComponent(actions)
       .setButtonText('Approve & Learn')
@@ -1413,17 +1511,16 @@ class ReviewModal extends Modal {
         this.close();
       });
 
-    new ButtonComponent(actions)
-      .setButtonText('Reject')
-      .onClick(() => {
-        this.onComplete({ approved: false });
-        this.close();
-      });
+    new ButtonComponent(actions).setButtonText('Reject').onClick(() => {
+      this.onComplete({ approved: false });
+      this.close();
+    });
   }
 }
 ```
 
 **Benefits:**
+
 - User control before committing
 - Learning from corrections
 - Trust building
@@ -1437,13 +1534,17 @@ class ReviewModal extends Modal {
 **Scope:** Batch multiple API calls for same operation (e.g., classify 5 PDFs in one request).
 
 **Implementation:**
+
 ```typescript
 class APIBatcher {
-  private batches = new Map<string, Array<{
-    content: string;
-    resolve: (result: any) => void;
-    reject: (error: Error) => void;
-  }>>();
+  private batches = new Map<
+    string,
+    Array<{
+      content: string;
+      resolve: (result: any) => void;
+      reject: (error: Error) => void;
+    }>
+  >();
   private timers = new Map<string, NodeJS.Timeout>();
   private batchSize = 5;
   private batchDelay = 1000; // ms
@@ -1451,7 +1552,7 @@ class APIBatcher {
   async classify(content: string, templateNames: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
       const key = `classify_${templateNames.join(',')}`;
-      
+
       if (!this.batches.has(key)) {
         this.batches.set(key, []);
       }
@@ -1464,9 +1565,12 @@ class APIBatcher {
       }
 
       // Set new timer to process batch
-      this.timers.set(key, setTimeout(() => {
-        this.processBatch(key, templateNames);
-      }, this.batchDelay));
+      this.timers.set(
+        key,
+        setTimeout(() => {
+          this.processBatch(key, templateNames);
+        }, this.batchDelay)
+      );
 
       // If batch is full, process immediately
       if (this.batches.get(key).length >= this.batchSize) {
@@ -1486,12 +1590,12 @@ class APIBatcher {
     try {
       const response = await fetch(`${serverUrl}/api/classify-batch`, {
         method: 'POST',
-        headers: { 
+        headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
+          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          contents: batch.map(b => b.content),
+          contents: batch.map((b) => b.content),
           templateNames,
         }),
       });
@@ -1502,7 +1606,7 @@ class APIBatcher {
         item.resolve(results[index]);
       });
     } catch (error) {
-      batch.forEach(item => {
+      batch.forEach((item) => {
         item.reject(error);
       });
     }
@@ -1513,16 +1617,13 @@ class APIBatcher {
 async function recommendClassificationStep(context: ProcessingContext) {
   const batcher = APIBatcher.getInstance();
   const templateNames = await context.plugin.getTemplateNames();
-  
-  const result = await batcher.classify(
-    context.content,
-    templateNames
-  );
+
+  const result = await batcher.classify(context.content, templateNames);
 
   context.classification = {
     documentType: result,
     confidence: 100,
-    reasoning: "N/A",
+    reasoning: 'N/A',
   };
 
   return context;
@@ -1530,6 +1631,7 @@ async function recommendClassificationStep(context: ProcessingContext) {
 ```
 
 **Benefits:**
+
 - 5x faster for batch uploads
 - Reduced API costs
 - Better resource utilization
@@ -1543,6 +1645,7 @@ async function recommendClassificationStep(context: ProcessingContext) {
 **Scope:** Save and load complete processing configurations.
 
 **Architecture:**
+
 ```typescript
 interface ProcessingPreset {
   id: string;
@@ -1553,13 +1656,13 @@ interface ProcessingPreset {
     enableClassification?: boolean;
     enableRenaming?: boolean;
     enableTags?: boolean;
-    classification?: string;       // Force this classification
-    folder?: string;               // Force this destination
-    tags?: string[];              // Add these tags
-    template?: string;            // Use this template
+    classification?: string; // Force this classification
+    folder?: string; // Force this destination
+    tags?: string[]; // Add these tags
+    template?: string; // Use this template
     formatBehavior?: 'override' | 'newFile' | 'append';
   };
-  filePattern?: string;          // Auto-apply to matching files
+  filePattern?: string; // Auto-apply to matching files
 }
 
 class PresetManager {
@@ -1614,16 +1717,14 @@ export const PresetSelector = () => {
   return (
     <div className="preset-selector">
       <h3>Processing Presets</h3>
-      {presets.map(preset => (
+      {presets.map((preset) => (
         <div key={preset.id} className="preset-card">
           <div className="preset-icon">{preset.icon || '📋'}</div>
           <div className="preset-info">
             <div className="preset-name">{preset.name}</div>
             <div className="preset-description">{preset.description}</div>
           </div>
-          <button onClick={() => applyPreset(preset.id)}>
-            Apply
-          </button>
+          <button onClick={() => applyPreset(preset.id)}>Apply</button>
         </div>
       ))}
     </div>
@@ -1678,6 +1779,7 @@ const DEFAULT_PRESETS: ProcessingPreset[] = [
 ```
 
 **Benefits:**
+
 - One-click workflows
 - Consistency across files
 - Shareable configurations
@@ -1693,6 +1795,7 @@ const DEFAULT_PRESETS: ProcessingPreset[] = [
 **Current Issue:** All suggestions (tags, folders, titles, classification) load simultaneously.
 
 **Optimization:**
+
 ```typescript
 // Load in priority order with delays
 export const AssistantView = ({ plugin, file, content }) => {
@@ -1734,12 +1837,16 @@ export const AssistantView = ({ plugin, file, content }) => {
 **Current Issue:** Same file content re-extracted multiple times.
 
 **Optimization:**
+
 ```typescript
 class ContentCache {
   private cache = new Map<string, { content: string; timestamp: number }>();
   private ttl = 5 * 60 * 1000; // 5 minutes
 
-  async getContent(file: TFile, extractor: () => Promise<string>): Promise<string> {
+  async getContent(
+    file: TFile,
+    extractor: () => Promise<string>
+  ): Promise<string> {
     const key = `${file.path}_${file.stat.mtime}`;
     const cached = this.cache.get(key);
 
@@ -1757,9 +1864,8 @@ class ContentCache {
 // Usage
 async function getContentStep(context: ProcessingContext) {
   const cache = ContentCache.getInstance();
-  const content = await cache.getContent(
-    context.inboxFile,
-    () => context.plugin.getTextFromFile(context.inboxFile)
+  const content = await cache.getContent(context.inboxFile, () =>
+    context.plugin.getTextFromFile(context.inboxFile)
   );
   context.content = content;
   return context;
@@ -1775,6 +1881,7 @@ async function getContentStep(context: ProcessingContext) {
 **Current Issue:** Same API request made multiple times if user clicks quickly.
 
 **Optimization:**
+
 ```typescript
 class RequestDeduplicator {
   private pending = new Map<string, Promise<any>>();
@@ -1797,7 +1904,7 @@ class RequestDeduplicator {
 const fetchTags = async () => {
   const deduplicator = RequestDeduplicator.getInstance();
   const key = `tags_${file.path}_${content.slice(0, 100)}`;
-  
+
   const tags = await deduplicator.dedupe(key, () =>
     plugin.recommendTags(content, file.basename, vaultTags)
   );
@@ -1815,6 +1922,7 @@ const fetchTags = async () => {
 **Current Issue:** Re-process entire file even if only one field changed.
 
 **Optimization:**
+
 ```typescript
 interface ProcessingState {
   fileHash: string;
@@ -1855,17 +1963,21 @@ async function processInboxFile(inboxFile: TFile, hash: string) {
 **Current Issue:** String-based action matching is error-prone.
 
 **Fix:**
+
 ```typescript
 // Define action types with strict enum
 enum ActionType {
-  CLEANUP = "cleanup",
-  EXTRACT = "extract",
-  CLASSIFY = "classify",
+  CLEANUP = 'cleanup',
+  EXTRACT = 'extract',
+  CLASSIFY = 'classify',
   // ...
 }
 
 // Create mapping of actions to their "done" counterparts
-const ACTION_PAIRS: Record<ActionType, { done: ActionType; error: ActionType }> = {
+const ACTION_PAIRS: Record<
+  ActionType,
+  { done: ActionType; error: ActionType }
+> = {
   [ActionType.CLEANUP]: {
     done: ActionType.CLEANUP_DONE,
     error: ActionType.ERROR_CLEANUP,
@@ -1880,7 +1992,7 @@ async function executeStep<T>(
   action: ActionType
 ): Promise<T> {
   const { done, error } = ACTION_PAIRS[action];
-  
+
   try {
     context.recordManager.addAction(context.hash, action);
     const result = await step(context);
@@ -1900,6 +2012,7 @@ async function executeStep<T>(
 **Current Issue:** Hard-coded dependencies make testing difficult.
 
 **Fix:**
+
 ```typescript
 interface ProcessingDependencies {
   plugin: FileOrganizer;
@@ -1940,6 +2053,7 @@ const inbox = new Inbox({
 **Current Issue:** Generic error messages lack actionable details.
 
 **Fix:**
+
 ```typescript
 class ProcessingError extends Error {
   constructor(
@@ -1957,14 +2071,11 @@ class ProcessingError extends Error {
   }
 
   toUserMessage(): string {
-    const parts = [
-      `Error during ${this.action}`,
-      `File: ${this.context.file}`,
-    ];
+    const parts = [`Error during ${this.action}`, `File: ${this.context.file}`];
 
     if (this.context.suggestions) {
       parts.push('Suggestions:');
-      parts.push(...this.context.suggestions.map(s => `  - ${s}`));
+      parts.push(...this.context.suggestions.map((s) => `  - ${s}`));
     }
 
     return parts.join('\n');
@@ -1993,6 +2104,7 @@ throw new ProcessingError(
 ## User Journey Improvements
 
 ### Before (Current State)
+
 ```
 1. User drops PDF in inbox
 2. File disappears (no feedback)
@@ -2011,6 +2123,7 @@ Satisfaction: 2/5
 ```
 
 ### After (Improved)
+
 ```
 1. User drops PDF in inbox
 2. Toast: "📄 my-file.pdf: Queued (position 3 of 5)"
@@ -2038,11 +2151,13 @@ Satisfaction: 4.5/5
 ### Immediate Priorities (Sprint 1)
 
 1. **Add Toast Notifications** (E1)
+
    - Impact: HIGH
    - Effort: LOW
    - User Benefit: Instant feedback
 
 2. **Expose Bypass/Error Logs** (E2)
+
    - Impact: HIGH
    - Effort: LOW
    - User Benefit: Troubleshooting
@@ -2055,11 +2170,13 @@ Satisfaction: 4.5/5
 ### Short-term Improvements (Sprint 2-3)
 
 4. **Implement Undo Stack** (M1)
+
    - Impact: HIGH
    - Effort: MEDIUM
    - User Benefit: Safety net
 
 5. **Processing Timeline View** (M3)
+
    - Impact: MEDIUM
    - Effort: MEDIUM
    - User Benefit: Transparency
@@ -2072,11 +2189,13 @@ Satisfaction: 4.5/5
 ### Long-term Vision (Sprint 4+)
 
 7. **Real-Time Dashboard** (H1)
+
    - Impact: HIGH
    - Effort: HIGH
    - User Benefit: Complete visibility
 
 8. **Preference Learning** (H2)
+
    - Impact: HIGH
    - Effort: HIGH
    - User Benefit: Reduced manual work
@@ -2091,18 +2210,21 @@ Satisfaction: 4.5/5
 ## Metrics to Track
 
 ### User Experience
+
 - **Time to first feedback:** Target < 1 second
 - **Processing transparency score:** Target 90%+
 - **Error resolution rate:** Target 80%+
 - **Undo usage rate:** Track to measure automation trust
 
 ### Performance
+
 - **Average processing time:** Track by file type
 - **API call efficiency:** Calls per file processed
 - **Queue throughput:** Files per minute
 - **Error rate:** Target < 5%
 
 ### Adoption
+
 - **Feature usage rates:** Which suggestions clicked most?
 - **Settings complexity:** How many users customize?
 - **Support tickets:** Reduction after improvements

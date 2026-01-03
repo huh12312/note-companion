@@ -5,6 +5,14 @@ import { handleAuthorizationV2 } from "@/lib/handleAuthorization";
 import { incrementAndLogTokenUsage } from "@/lib/incrementAndLogTokenUsage";
 import { getModel } from "@/lib/models";
 
+/**
+ * Document classification endpoint.
+ *
+ * NOTE: Despite the "1" suffix, this is the CURRENT and ONLY classification endpoint.
+ * The name is kept as-is for backward compatibility with existing plugin installations.
+ *
+ * Plugin usage: packages/plugin/index.ts:837 - classifyContentV2() method
+ */
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await handleAuthorizationV2(request);

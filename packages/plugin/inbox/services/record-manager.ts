@@ -91,7 +91,8 @@ export class RecordManager {
   private idService: IdService;
   private app: App;
   private debounceTimeout: TimeoutID | null = null;
-  // temp hack while using hardcoded path
+  // Records are internal metadata stored in a fixed location
+  // This path is intentionally not user-configurable to prevent breaking plugin functionality
   private settings: { recordFilePath: string };
 
   private constructor(app: App) {
