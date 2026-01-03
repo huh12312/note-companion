@@ -113,6 +113,35 @@ describe('updateClerkMetadata', () => {
       consoleErrorSpy.mockRestore();
     });
 
+    it('should handle 404 errors gracefully when user does not exist', async () => {
+      const customerData: CustomerData = {
+        userId: 'user_123',
+        customerId: 'cus_123',
+        status: 'active',
+        paymentStatus: 'paid',
+        product: 'pro',
+        plan: 'monthly',
+        billingCycle: 'monthly',
+        lastPayment: new Date('2024-01-01'),
+      };
+
+      const error: any = new Error('Not Found');
+      error.status = 404;
+      error.clerkError = true;
+      mockUpdateUserMetadata.mockRejectedValueOnce(error);
+
+      const consoleWarnSpy = jest.spyOn(console, 'warn').mockImplementation();
+
+      // Should not throw
+      await updateClerkMetadata(customerData);
+
+      expect(consoleWarnSpy).toHaveBeenCalledWith(
+        `Clerk user ${customerData.userId} not found, skipping metadata update. This is expected if the user was deleted from Clerk.`
+      );
+
+      consoleWarnSpy.mockRestore();
+    });
+
     it('should throw error when clerkClient() fails', async () => {
       const customerData: CustomerData = {
         userId: 'user_123',
@@ -160,4 +189,3 @@ describe('updateClerkMetadata', () => {
     });
   });
 });
-

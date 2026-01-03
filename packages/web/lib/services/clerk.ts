@@ -19,8 +19,18 @@ export async function updateClerkMetadata(data: CustomerData) {
     });
 
     console.log(`Updated Clerk metadata for user ${data.userId}`);
-  } catch (error) {
+  } catch (error: any) {
+    // Handle case where user doesn't exist in Clerk (404)
+    // This can happen when user is deleted from Clerk but subscription still exists
+    if (error?.status === 404 || error?.clerkError === true) {
+      console.warn(
+        `Clerk user ${data.userId} not found, skipping metadata update. This is expected if the user was deleted from Clerk.`
+      );
+      return; // Don't throw - this is a non-critical error
+    }
+
+    // For other errors, log and re-throw
     console.error('Error updating Clerk metadata:', error);
-    throw error; // Re-throw to be handled by the webhook handler
+    throw error;
   }
-} 
+}
