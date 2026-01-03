@@ -20,6 +20,7 @@ export async function checkAndCreateFolders(
 
   await ensureFolderExists(app, settings.stagingFolder);
   await ensureFolderExists(app, settings.backupFolderPath);
+  await ensureFolderExists(app, settings.recordingsFolderPath);
 }
 
 export async function checkAndCreateTemplates(

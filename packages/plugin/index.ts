@@ -1303,6 +1303,30 @@ export default class FileOrganizer extends Plugin {
       },
     });
     this.addCommand({
+      id: "open-meetings-tab",
+      name: "Open Meetings Tab",
+      callback: async () => {
+        const view = await this.ensureAssistantView();
+        view?.activateTab("meetings");
+      },
+    });
+
+    this.addCommand({
+      id: "view-meetings-metadata",
+      name: "View Meetings Metadata (Debug)",
+      callback: async () => {
+        const { MeetingMetadataManager } = await import(
+          "./views/assistant/meetings/meeting-metadata"
+        );
+        const manager = new MeetingMetadataManager(this);
+        const metadata = await manager.loadMetadata();
+        console.log("Meetings Metadata:", JSON.stringify(metadata, null, 2));
+        new Notice(
+          "Meetings metadata logged to console. Check Developer Tools (Ctrl+Shift+I)"
+        );
+      },
+    });
+    this.addCommand({
       id: "add-selection-to-chat",
       name: "Add Selection to Chat",
       editorCallback: async editor => {

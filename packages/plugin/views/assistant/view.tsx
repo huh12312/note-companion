@@ -9,15 +9,16 @@ import { AppContext } from "./provider";
 import AIChatSidebar from "./ai-chat/container";
 import ReactMarkdown from "react-markdown";
 import { SyncTab } from "./synchronizer/sync-tab";
+import { MeetingsTab } from "./meetings";
 import { StyledContainer } from "../../components/ui/utils";
 import { tw } from "../../lib/utils";
-import { Sparkles, Inbox, MessageSquare, Cloud } from "lucide-react";
+import { Sparkles, Inbox, MessageSquare, Cloud, Mic } from "lucide-react";
 import { UpgradeButton } from "../../components/upgrade-button";
 import { UsageData } from "../..";
 
 export const ORGANIZER_VIEW_TYPE = "fo2k.assistant.sidebar2";
 
-type Tab = "organizer" | "inbox" | "chat" | "sync";
+type Tab = "organizer" | "inbox" | "chat" | "sync" | "meetings";
 
 function TabContent({
   activeTab,
@@ -112,6 +113,15 @@ function TabContent({
           <SyncTab plugin={plugin} onTokenLimitError={onTokenLimitError} />
         </div>
       )}
+
+      <div
+        className={tw(
+          "flex-1 min-h-0 w-full",
+          activeTab === "meetings" ? "block" : "hidden"
+        )}
+      >
+        <MeetingsTab plugin={plugin} />
+      </div>
     </div>
   );
 }
@@ -255,6 +265,13 @@ function AssistantContent({
           >
             Chat
           </TabButton>
+          <TabButton
+            isActive={activeTab === "meetings"}
+            onClick={() => setActiveTab("meetings")}
+            icon={<Mic className="w-4 h-4" />}
+          >
+            Meetings
+          </TabButton>
           {showSyncTab && (
             <TabButton
               isActive={activeTab === "sync"}
@@ -321,6 +338,12 @@ export class AssistantViewWrapper extends ItemView {
       id: "open-chat-tab",
       name: "Open Chat Tab",
       callback: () => this.activateTab("chat"),
+    });
+
+    this.plugin.addCommand({
+      id: "open-meetings-tab",
+      name: "Open Meetings Tab",
+      callback: () => this.activateTab("meetings"),
     });
 
     // Only register sync tab command if enabled in settings

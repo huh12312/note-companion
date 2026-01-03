@@ -13,6 +13,7 @@ export class FileOrganizerSettings {
   bypassedFilePath = "_NoteCompanion/Bypassed";
   errorFilePath = "_NoteCompanion/Errors";
   syncFolderPath = "_NoteCompanion/Sync";
+  recordingsFolderPath = "Recordings";
 
   // inbox settings
   useSimilarTags = true;

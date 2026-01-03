@@ -1,0 +1,29 @@
+{
+  "recordings": [
+    {
+      "filePath": "1er call.mp3",
+      "createdAt": "2025-12-08T02:12:35.636Z",
+      "transcribed": false,
+      "discovered": true
+    },
+    {
+      "filePath": "1er call 9.17.45 AM.mp3",
+      "createdAt": "2025-12-08T01:24:05.357Z",
+      "transcribed": false,
+      "discovered": true
+    },
+    {
+      "filePath": "_NoteCompanion/Processed/Attachments/Call.mp3",
+      "createdAt": "2025-12-14T01:44:22.461Z",
+      "transcribed": false,
+      "discovered": true
+    },
+    {
+      "filePath": "_NoteCompanion/Processed/Attachments/Ref Rogers Yahya.mp3",
+      "createdAt": "2025-12-25T18:20:30.801Z",
+      "transcribed": false,
+      "discovered": true
+    }
+  ],
+  "lastScan": "2026-01-02T16:09:55.206Z"
+}
