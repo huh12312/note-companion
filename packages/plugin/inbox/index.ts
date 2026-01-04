@@ -1,4 +1,4 @@
-import { TFile, moment, TFolder, Vault } from "obsidian";
+import { TFile, moment, TFolder, Vault, Notice } from "obsidian";
 import FileOrganizer from "../index";
 import { Queue } from "./services/queue";
 import {
@@ -712,10 +712,19 @@ async function handleBypass(
 ): Promise<void> {
   try {
     logger.info("Bypassing file", context.inboxFile);
-    // First mark as bypassed in the record manager
+
+    // Show user notification
+    const fileName = context.inboxFile.basename;
+    const bypassedFolderPath = context.plugin.settings.bypassedFilePath;
+
+    if (context.plugin.settings.enableProcessingNotifications) {
+      new Notice(
+        `⚠️ Bypassed: ${fileName}\nReason: ${reason}\nLocation: ${bypassedFolderPath}`,
+        5000
+      );
+    }
 
     // Then move the file
-    const bypassedFolderPath = context.plugin.settings.bypassedFilePath;
     await safeMove(context.plugin.app, context.inboxFile, bypassedFolderPath);
 
     context.queue.bypass(context.hash);
@@ -871,25 +880,46 @@ async function handleError(
 
   context.recordManager.setStatus(context.hash, "error");
 
+  const fileName = context.inboxFile.basename;
+  const errorMessage = lastError?.error?.message || error.message || "Unknown error";
+  const errorAction = lastError?.action;
+
+  // Determine destination folder and error type
+  let destinationFolder: string;
+  let errorType: string;
+
   // Different handling based on error type
-  switch (lastError?.action) {
+  switch (errorAction) {
     case Action.ERROR_MOVING_ATTACHMENT:
     case Action.ERROR_MOVING:
-      // Handle file system errors
+      destinationFolder = context.plugin.settings.errorFilePath;
+      errorType = "File system error";
       await moveFileToErrorFolder(context);
       break;
     case Action.ERROR_CLASSIFY:
     case Action.ERROR_TAGGING:
-      // Handle AI-related errors
+      destinationFolder = context.plugin.settings.backupFolderPath;
+      errorType = "AI processing error";
       await moveToBackupFolder(context);
       break;
     case Action.ERROR_FETCH_YOUTUBE:
-      // Handle YouTube errors by moving to backup folder
+      destinationFolder = context.plugin.settings.backupFolderPath;
+      errorType = "YouTube transcript error";
       await moveToBackupFolder(context);
       break;
     default:
-      // Default error handling
+      destinationFolder = context.plugin.settings.errorFilePath;
+      errorType = "Processing error";
       await moveFileToErrorFolder(context);
+  }
+
+  // Show user notification
+  if (context.plugin.settings.enableProcessingNotifications && errorAction) {
+    const formattedMessage = formatErrorMessage(errorAction, errorMessage);
+    new Notice(
+      `❌ Error: ${fileName}\n${errorType}: ${formattedMessage}\nLocation: ${destinationFolder}`,
+      6000
+    );
   }
 }
 
@@ -942,7 +972,7 @@ function shouldSkipAction(context: ProcessingContext, action: Action): boolean {
   }
 }
 
-function getActionDisplayName(action: Action): string {
+export function getActionDisplayName(action: Action): string {
   const actionMap: Record<string, string> = {
     [Action.EXTRACT]: "Extracting content",
     [Action.CLASSIFY]: "Classifying document",
@@ -952,6 +982,63 @@ function getActionDisplayName(action: Action): string {
     [Action.FORMATTING]: "Formatting content",
   };
   return actionMap[action] || action.toString();
+}
+
+function formatErrorMessage(
+  action: Action,
+  errorMessage: string
+): string {
+  // Map technical error actions to user-friendly descriptions
+  const actionMap: Record<string, string> = {
+    [Action.ERROR_MOVING]: "Failed to move file",
+    [Action.ERROR_MOVING_ATTACHMENT]: "Failed to move attachment",
+    [Action.ERROR_CLASSIFY]: "Failed to classify document",
+    [Action.ERROR_TAGGING]: "Failed to generate tags",
+    [Action.ERROR_FETCH_YOUTUBE]: "Failed to fetch YouTube transcript",
+    [Action.ERROR_EXTRACT]: "Failed to extract content",
+    [Action.ERROR_RENAME]: "Failed to rename file",
+    [Action.ERROR_FORMATTING]: "Failed to format content",
+    [Action.ERROR_CLEANUP]: "Failed to clean up file",
+    [Action.ERROR_VALIDATE]: "Failed to validate file",
+    [Action.ERROR_CONTAINER]: "Failed to create container",
+    [Action.ERROR_APPEND]: "Failed to append attachment",
+    [Action.ERROR_COMPLETE]: "Failed to complete processing",
+  };
+
+  const userFriendlyAction = actionMap[action] || action.toString();
+
+  // Truncate long error messages
+  const maxLength = 100;
+  const truncatedMessage = errorMessage.length > maxLength
+    ? errorMessage.substring(0, maxLength) + "..."
+    : errorMessage;
+
+  return `${userFriendlyAction}: ${truncatedMessage}`;
+}
+
+function calculateProgress(record: FileRecord): number {
+  // Define total pipeline steps (excluding optional ones)
+  const totalSteps = [
+    Action.CLEANUP,
+    Action.VALIDATE,
+    Action.CONTAINER,
+    Action.MOVING_ATTACHMENT,
+    Action.EXTRACT,
+    Action.CLASSIFY,
+    Action.MOVING,
+    Action.RENAME,
+    Action.FORMATTING,
+    Action.APPEND,
+    Action.TAGGING,
+    Action.COMPLETED,
+  ].length;
+
+  // Count completed steps (excluding skipped)
+  const completedSteps = Object.values(record.logs).filter(
+    (log) => log.completed && !log.skipped
+  ).length;
+
+  return Math.round((completedSteps / totalSteps) * 100);
 }
 
 async function executeStep(
@@ -985,10 +1072,42 @@ async function executeStep(
       const fileName =
         context.containerFile?.basename || context.inboxFile.basename;
       const actionName = getActionDisplayName(action);
+
+      // Calculate queue position and progress
+      const allRecords = context.recordManager.getAllRecords();
+      const processingFiles = allRecords.filter((r) => r.status === "processing");
+      const queuedFiles = allRecords.filter((r) => r.status === "queued");
+
+      // Calculate queue position for current file
+      const currentFileIndex = processingFiles.findIndex(
+        (r) => r.id === context.hash
+      );
+      const queuePosition =
+        currentFileIndex >= 0
+          ? queuedFiles.length + currentFileIndex + 1
+          : queuedFiles.length + processingFiles.length + 1;
+      const totalInQueue = queuedFiles.length + processingFiles.length;
+
+      // Calculate progress percentage
+      const record = context.recordManager.getRecord(context.hash);
+      const progress = record ? calculateProgress(record) : 0;
+
+      // Enhanced notification with queue position and progress
+      const queueInfo =
+        totalInQueue > 1 ? ` (${queuePosition}/${totalInQueue})` : "";
+      const progressInfo = progress > 0 ? ` - ${progress}%` : "";
+      new Notice(
+        `📄 ${fileName}: ${actionName}${queueInfo}${progressInfo}`,
+        3000
+      );
+
       context.plugin.app.workspace.trigger("file-organizer:processing-step", {
         fileName,
         action: actionName,
         hash: context.hash,
+        queuePosition: totalInQueue > 1 ? queuePosition : undefined,
+        totalInQueue: totalInQueue > 1 ? totalInQueue : undefined,
+        progress,
       });
     }
 

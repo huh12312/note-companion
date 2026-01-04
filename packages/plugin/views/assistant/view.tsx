@@ -15,6 +15,7 @@ import { tw } from "../../lib/utils";
 import { Sparkles, Inbox, MessageSquare, Cloud, Mic } from "lucide-react";
 import { UpgradeButton } from "../../components/upgrade-button";
 import { UsageData } from "../..";
+import { Inbox as InboxService } from "../../inbox";
 
 export const ORGANIZER_VIEW_TYPE = "fo2k.assistant.sidebar2";
 
@@ -131,11 +132,13 @@ function TabButton({
   onClick,
   icon,
   children,
+  badge,
 }: {
   isActive: boolean;
   onClick: () => void;
   icon?: React.ReactNode;
   children: React.ReactNode;
+  badge?: number;
 }) {
   return (
     <button
@@ -157,6 +160,15 @@ function TabButton({
     >
       {icon && <span className={tw("w-4 h-4 flex-shrink-0")}>{icon}</span>}
       {children}
+      {badge !== undefined && badge > 0 && (
+        <span
+          className={tw(
+            "ml-1 px-1.5 py-0.5 text-xs rounded-full bg-[--interactive-accent] text-[--text-on-accent] font-medium min-w-[1.25rem] text-center"
+          )}
+        >
+          {badge}
+        </span>
+      )}
     </button>
   );
 }
@@ -175,6 +187,7 @@ function AssistantContent({
   const [activeTab, setActiveTab] = React.useState<Tab>(initialTab);
   const [usageData, setUsageData] = React.useState<UsageData | null>(null);
   const [forceShowUpgrade, setForceShowUpgrade] = React.useState(false);
+  const [processingCount, setProcessingCount] = React.useState(0);
 
   React.useEffect(() => {
     onTabChange(setActiveTab);
@@ -196,6 +209,34 @@ function AssistantContent({
     if (plugin.settings.API_KEY) {
       fetchUsage();
     }
+  }, [plugin]);
+
+  // Track processing count for Inbox badge
+  React.useEffect(() => {
+    const updateProcessingCount = () => {
+      try {
+        const inbox = InboxService.getInstance();
+        const analytics = inbox.getAnalytics();
+        const activeCount =
+          analytics.queueStats.processing + analytics.queueStats.queued;
+        setProcessingCount(activeCount);
+      } catch (error) {
+        // Silently handle errors (Inbox might not be initialized)
+        setProcessingCount(0);
+      }
+    };
+
+    updateProcessingCount();
+    const interval = setInterval(updateProcessingCount, 500);
+
+    // Listen to workspace events
+    const handler = () => updateProcessingCount();
+    plugin.app.workspace.on("file-organizer:processing-step", handler);
+
+    return () => {
+      clearInterval(interval);
+      plugin.app.workspace.off("file-organizer:processing-step", handler);
+    };
   }, [plugin]);
 
   // Helper function to check if upgrade button should be shown
@@ -255,6 +296,7 @@ function AssistantContent({
             isActive={activeTab === "inbox"}
             onClick={() => setActiveTab("inbox")}
             icon={<Inbox className="w-4 h-4" />}
+            badge={processingCount}
           >
             Inbox
           </TabButton>

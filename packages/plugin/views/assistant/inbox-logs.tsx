@@ -375,11 +375,37 @@ const EssentialInfoDisplay: React.FC<{ record: FileRecord }> = ({ record }) => {
   );
 };
 
+// Helper function to get queue position
+function getQueuePosition(record: FileRecord): { position: number; total: number } | null {
+  try {
+    const inbox = Inbox.getInstance();
+    const allRecords = inbox.getAllFiles();
+    const queued = allRecords.filter((r) => r.status === "queued");
+    const processing = allRecords.filter((r) => r.status === "processing");
+
+    if (record.status === "queued") {
+      const position = queued.findIndex((r) => r.id === record.id) + 1;
+      const total = queued.length + processing.length;
+      return total > 1 ? { position, total } : null;
+    }
+    if (record.status === "processing") {
+      const position = queued.length + processing.findIndex((r) => r.id === record.id) + 1;
+      const total = queued.length + processing.length;
+      return total > 1 ? { position, total } : null;
+    }
+    return null;
+  } catch (error) {
+    // Silently handle errors (Inbox might not be initialized)
+    return null;
+  }
+}
+
 // Main file card component - compressed, dense list item
 function FileCard({ record }: { record: FileRecord }) {
   const plugin = usePlugin();
   const [isExpanded, setIsExpanded] = React.useState(false);
   const errorSummary = getErrorSummary(record);
+  const queuePosition = getQueuePosition(record);
 
   // Check if there's content to show when expanded
   const hasExpandableContent =
@@ -431,6 +457,11 @@ function FileCard({ record }: { record: FileRecord }) {
             >
               <StatusBadge status={record.status} />
               <FileNameDisplay record={record} />
+              {queuePosition && (
+                <span className="text-[--text-muted] text-xs">
+                  (Queue: {queuePosition.position}/{queuePosition.total})
+                </span>
+              )}
               {errorSummary && (
                 <span className="text-[--text-error] text-xs truncate">
                   • {errorSummary}

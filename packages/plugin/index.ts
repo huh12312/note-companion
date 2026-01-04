@@ -63,6 +63,9 @@ import {
 import { initializeInboxQueue, Inbox } from "./inbox";
 import { logger } from "./services/logger";
 import { addTextSelectionContext } from "./views/assistant/ai-chat/use-context-items";
+import { ProcessingStatusBar } from "./components/processing-status-bar";
+import * as React from "react";
+import { createRoot, Root } from "react-dom/client";
 
 type TagCounts = {
   [key: string]: number;
@@ -119,6 +122,8 @@ export interface UsageData {
 export default class FileOrganizer extends Plugin {
   public inbox: Inbox;
   settings: FileOrganizerSettings;
+  private statusBarItem: HTMLElement | null = null;
+  private statusBarRoot: Root | null = null;
 
   async loadSettings() {
     this.settings = Object.assign({}, DEFAULT_SETTINGS, await this.loadData());
@@ -1363,6 +1368,11 @@ export default class FileOrganizer extends Plugin {
         this.activateDashboard();
       },
     });
+
+    // Add processing status bar item
+    this.statusBarItem = this.addStatusBarItem();
+    this.statusBarRoot = createRoot(this.statusBarItem);
+    this.statusBarRoot.render(React.createElement(ProcessingStatusBar, { plugin: this }));
   }
   async saveSettings() {
     await this.saveData(this.settings);

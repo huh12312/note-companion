@@ -66,31 +66,39 @@ function createObsidianFetch() {
 /**
  * Decodes HTML entities in a string
  * Works in both browser and Node.js environments
+ * Handles double-encoded entities like &amp;#39; by doing multiple passes
  */
 function decodeHtmlEntities(text: string): string {
-  // Use regex-based decoder first (more reliable for numeric entities)
-  const decoded = text
-    // Decode numeric entities first (&#39;, &#x27;, etc.)
-    .replace(/&#(\d+);/g, (match, dec) =>
-      String.fromCharCode(parseInt(dec, 10))
-    )
-    .replace(/&#x([0-9a-fA-F]+);/gi, (match, hex) =>
-      String.fromCharCode(parseInt(hex, 16))
-    )
-    // Then decode named entities
-    .replace(/&#39;/g, "'")
-    .replace(/&apos;/g, "'")
-    .replace(/&quot;/g, '"')
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">");
+  let decoded = text;
+  let previousDecoded = "";
+
+  // Keep decoding until no more changes occur (handles double-encoded entities)
+  while (decoded !== previousDecoded) {
+    previousDecoded = decoded;
+
+    // Decode numeric entities (&#39;, &#x27;, etc.) - must come before &amp; decoding
+    decoded = decoded
+      .replace(/&#(\d+);/g, (match, dec) =>
+        String.fromCharCode(parseInt(dec, 10))
+      )
+      .replace(/&#x([0-9a-fA-F]+);/gi, (match, hex) =>
+        String.fromCharCode(parseInt(hex, 16))
+      );
+
+    // Decode named entities (decode &amp; last to avoid double-decoding issues)
+    decoded = decoded
+      .replace(/&apos;/g, "'")
+      .replace(/&quot;/g, '"')
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/&amp;/g, "&"); // Decode &amp; last so it doesn't interfere with numeric entities
+  }
 
   // Try DOM API as additional pass (works in browser/Electron)
   if (typeof document !== "undefined" && decoded !== text) {
     try {
       const div = document.createElement("div");
-      div.textContent = decoded; // Set decoded text
-      // If DOM can further decode, use it
+      div.innerHTML = decoded; // Use innerHTML to let browser decode any remaining entities
       const domDecoded = div.textContent || div.innerText || decoded;
       return domDecoded;
     } catch (e) {
@@ -279,9 +287,12 @@ export async function getYouTubeContent(
     }
 
     // Combine transcript items into a single string
-    const transcript = transcriptItems
+    const rawTranscript = transcriptItems
       .map((item: { text: string }) => item.text)
       .join(" ");
+
+    // Decode HTML entities in transcript (handles cases like &amp;#39;)
+    const decodedTranscript = decodeHtmlEntities(rawTranscript);
 
     // Ensure title is properly decoded (double-check)
     const decodedTitle = decodeHtmlEntities(title);
@@ -289,10 +300,10 @@ export async function getYouTubeContent(
     console.log("[YouTube Service] Successfully fetched:", {
       originalTitle: title,
       decodedTitle: decodedTitle,
-      transcriptLength: transcript.length,
+      transcriptLength: decodedTranscript.length,
     });
 
-    return { title: decodedTitle, transcript };
+    return { title: decodedTitle, transcript: decodedTranscript };
   } catch (error) {
     if (error instanceof YouTubeError) {
       throw error; // Re-throw YouTubeError as-is
