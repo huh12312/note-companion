@@ -32,6 +32,16 @@ async function createFallbackUser() {
 async function ensureAuthorizedUser(req: NextRequest) {
   const initialLicenseKey = getToken(req);
 
+  // Check if key is obviously invalid before attempting auth
+  if (initialLicenseKey && initialLicenseKey.trim().length < 10) {
+    console.warn('Invalid API key format detected - too short', {
+      keyLength: initialLicenseKey.trim().length,
+      keyPrefix: initialLicenseKey.substring(0, 10) + '...',
+    });
+    // Still create fallback user for top-up flow, but log the issue
+    // Frontend validation should prevent this, but handle gracefully on server
+  }
+
   try {
     const { userId } = await handleAuthorizationV2(req);
     return { userId, licenseKey: initialLicenseKey };
@@ -50,21 +60,32 @@ async function ensureAuthorizedUser(req: NextRequest) {
       licenseKeyPrefix: initialLicenseKey
         ? initialLicenseKey.substring(0, 10) + '...'
         : 'none',
+      keyLength: initialLicenseKey?.trim().length || 0,
       path: req.nextUrl.pathname,
     });
 
     // If a license key was provided but auth failed, log a warning
     if (initialLicenseKey) {
+      const isInvalidFormat = initialLicenseKey.trim().length < 10;
       console.warn(
         'License key provided but authentication failed - creating anonymous user as fallback',
         {
           keyPrefix: initialLicenseKey.substring(0, 10) + '...',
+          keyLength: initialLicenseKey.trim().length,
+          isInvalidFormat,
           error: errorMessage,
         }
       );
     }
 
-    return createFallbackUser();
+    const fallbackResult = await createFallbackUser();
+
+    // Return result with a flag indicating if anonymous user was created due to invalid key
+    return {
+      ...fallbackResult,
+      wasAnonymousUserCreated: true,
+      hadInvalidKey: !!initialLicenseKey && initialLicenseKey.trim().length < 10,
+    };
   }
 }
 
@@ -111,10 +132,10 @@ async function devTopUpMinutes(userId: string, minutes: number) {
 }
 
 export async function POST(req: NextRequest) {
-  let userId, licenseKey;
+  let userId, licenseKey, wasAnonymousUserCreated, hadInvalidKey;
 
   try {
-    ({ userId, licenseKey } = await ensureAuthorizedUser(req));
+    ({ userId, licenseKey, wasAnonymousUserCreated, hadInvalidKey } = await ensureAuthorizedUser(req));
   } catch (error) {
     return NextResponse.json(
       { error: 'Authentication failed' },
@@ -160,7 +181,15 @@ export async function POST(req: NextRequest) {
     },
   });
 
-  return NextResponse.json({ url: session.url, licenseKey });
+  return NextResponse.json({
+    url: session.url,
+    licenseKey,
+    // Include metadata about anonymous user creation for client awareness
+    ...(wasAnonymousUserCreated && {
+      anonymousUserCreated: true,
+      ...(hadInvalidKey && { invalidKeyDetected: true })
+    })
+  });
 }
 
 // Development-only endpoint to add minutes directly (no payment required)

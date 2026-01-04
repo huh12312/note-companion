@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Button } from "../assistant/ai-chat/button";
 import FileOrganizer from "../..";
+import { Notice } from "obsidian";
+import { validateApiKey } from "../../apiUtils";
 
 export function TopUpCredits({
   plugin,
@@ -12,6 +14,18 @@ export function TopUpCredits({
   const [loading, setLoading] = useState(false);
 
   const handleTopUp = async () => {
+    // Validate API key before making request
+    const validation = validateApiKey(plugin.settings.API_KEY);
+    if (!validation.isValid) {
+      new Notice(validation.error || "Invalid API key", 5000);
+      return;
+    }
+
+    // Warn if key seems too short but still allow attempt
+    if (validation.error) {
+      console.warn("API key validation warning:", validation.error);
+    }
+
     try {
       setLoading(true);
       const response = await fetch(`${plugin.getServerUrl()}/api/top-up`, {
@@ -29,6 +43,7 @@ export function TopUpCredits({
       onLicenseKeyChange(data.licenseKey);
     } catch (error) {
       console.error("Top-up error:", error);
+      new Notice("Failed to process top-up request", 5000);
     } finally {
       setLoading(false);
     }

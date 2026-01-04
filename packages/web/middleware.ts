@@ -1,5 +1,5 @@
 import { clerkMiddleware, createRouteMatcher } from '@clerk/nextjs/server';
-import { NextFetchEvent, NextRequest, NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 const isApiRoute = createRouteMatcher(['/api(.*)']);
 
@@ -47,12 +47,12 @@ function isStaticFile(pathname: string): boolean {
 }
 
 // Main middleware function that handles CORS and routing
-async function baseMiddleware(
-  req: NextRequest,
-  _event: NextFetchEvent
-): Promise<NextResponse> {
-  // Skip static files immediately
-  if (isStaticFile(req.nextUrl.pathname)) {
+async function baseMiddleware(req: NextRequest): Promise<NextResponse> {
+  // Skip static files immediately (but allow /config.js through if it needs auth)
+  if (
+    isStaticFile(req.nextUrl.pathname) &&
+    req.nextUrl.pathname !== '/config.js'
+  ) {
     return NextResponse.next();
   }
 
@@ -93,53 +93,68 @@ async function baseMiddleware(
   return res;
 }
 
-// Create the middleware export
-// If Clerk is configured, always use clerkMiddleware (required for auth() to work)
-// Clerk needs to see clerkMiddleware() at the top level to detect it
-const middleware = hasClerkConfig
-  ? clerkMiddleware(async (auth, req) => {
-      // Skip static files - don't run Clerk middleware on them
-      if (isStaticFile(req.nextUrl.pathname)) {
-        return NextResponse.next();
+// Always export clerkMiddleware (required for Clerk's runtime detection)
+// Branch inside the callback instead of conditionally exporting
+// This ensures auth() can be called anywhere without "clerkMiddleware not detected" errors
+export default clerkMiddleware(async (auth, req) => {
+  // Always run base middleware logic first (CORS, OPTIONS, etc.)
+  const baseResponse = await baseMiddleware(req);
+
+  // If base middleware returned early (e.g., OPTIONS), use that response
+  if (baseResponse.status === 204 || baseResponse.status !== 200) {
+    return baseResponse;
+  }
+
+  // Skip static files - don't run Clerk auth on them
+  // But allow /config.js through if it needs to call auth()
+  if (
+    isStaticFile(req.nextUrl.pathname) &&
+    req.nextUrl.pathname !== '/config.js'
+  ) {
+    return NextResponse.next();
+  }
+
+  // If Clerk isn't configured, don't call auth() - just pass through
+  // This prevents the "clerkMiddleware not detected" error
+  if (
+    !process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY ||
+    !process.env.CLERK_SECRET_KEY
+  ) {
+    // If not using Clerk but using solo instance, handle API key auth
+    const isSoloInstance =
+      process.env.SOLO_API_KEY && process.env.SOLO_API_KEY.length > 0;
+    if (isSoloInstance) {
+      return soloApiKeyMiddleware(req);
+    }
+    return NextResponse.next();
+  }
+
+  // Handle public routes - always allow through without auth
+  if (isPublicRoute(req)) {
+    console.log('isPublicRoute');
+    return NextResponse.next();
+  }
+
+  const enableUserManagement = process.env.ENABLE_USER_MANAGEMENT === 'true';
+
+  // If user management is enabled, enforce authentication
+  if (enableUserManagement) {
+    console.log('enableUserManagement', req.url);
+    if (isClerkProtectedRoute(req)) {
+      console.log('isClerkProtectedRoute');
+      // Only call auth() if Clerk is configured (we already checked above)
+      const { userId } = await auth();
+      console.log('userId', userId);
+      if (!userId) {
+        // (await auth()).redirectToSignIn();
       }
+    }
+  }
+  // If user management is disabled, just pass through (permissive)
+  // This allows auth() calls to work without enforcing authentication
 
-      // First run base middleware logic (CORS, etc.)
-      const baseResponse = await baseMiddleware(req, {} as NextFetchEvent);
-
-      // If base middleware returned early (e.g., OPTIONS), use that response
-      if (baseResponse.status === 204 || baseResponse.status !== 200) {
-        return baseResponse;
-      }
-
-      const enableUserManagement =
-        process.env.ENABLE_USER_MANAGEMENT === 'true';
-
-      // Handle public routes - always allow through
-      if (isPublicRoute(req)) {
-        console.log('isPublicRoute');
-        return NextResponse.next();
-      }
-
-      // If user management is enabled, enforce authentication
-      if (enableUserManagement) {
-        console.log('enableUserManagement', req.url);
-        if (isClerkProtectedRoute(req)) {
-          console.log('isClerkProtectedRoute');
-          const { userId } = await auth();
-          console.log('userId', userId);
-          if (!userId) {
-            // (await auth()).redirectToSignIn();
-          }
-        }
-      }
-      // If user management is disabled, just pass through (permissive)
-      // This allows auth() calls to work without enforcing authentication
-
-      return NextResponse.next();
-    })
-  : baseMiddleware;
-
-export default middleware;
+  return NextResponse.next();
+});
 
 export const config = {
   matcher: [
@@ -152,10 +167,14 @@ export const config = {
      * - apple-touch-icon.* (iOS icons with any extension)
      * - *.png, *.jpg, *.jpeg, *.gif, *.svg, *.ico (image files)
      * - *.woff, *.woff2, *.ttf, *.eot (font files)
-     * - *.css, *.js (static assets)
+     * - *.css, *.js, *.json (static assets)
+     *
+     * Note: /config.js is explicitly included in the matcher so middleware runs
+     * and clerkMiddleware is detected, even if we skip auth() for it
      */
-    '/((?!api|_next/static|_next/image|favicon\\.ico|apple-touch-icon.*|robots\\.txt|.*\\.(?:png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|css|js|txt)$).*)',
+    '/((?!api|_next/static|_next/image|favicon\\.ico|apple-touch-icon.*|robots\\.txt|.*\\.(?:png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|css|js|json|txt)$).*)',
     '/',
+    '/config.js', // Explicitly include config.js so middleware runs
     '/(api|trpc)(.*)',
   ],
 };

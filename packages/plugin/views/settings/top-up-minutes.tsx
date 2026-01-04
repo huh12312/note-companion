@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Button } from "../assistant/ai-chat/button";
 import FileOrganizer from "../..";
+import { Notice } from "obsidian";
+import { validateApiKey } from "../../apiUtils";
 
 export function TopUpMinutes({
   plugin,
@@ -12,6 +14,18 @@ export function TopUpMinutes({
   const [loading, setLoading] = useState(false);
 
   const handleTopUp = async () => {
+    // Validate API key before making request
+    const validation = validateApiKey(plugin.settings.API_KEY);
+    if (!validation.isValid) {
+      new Notice(validation.error || "Invalid API key", 5000);
+      return;
+    }
+
+    // Warn if key seems too short but still allow attempt
+    if (validation.error) {
+      console.warn("API key validation warning:", validation.error);
+    }
+
     try {
       setLoading(true);
       const response = await fetch(
@@ -26,12 +40,31 @@ export function TopUpMinutes({
       );
 
       const data = await response.json();
+
+      // Check if anonymous user was created due to invalid key
+      if (data.anonymousUserCreated && data.invalidKeyDetected) {
+        new Notice(
+          "Your API key was invalid. A new key has been generated and saved. Please use this key for future requests.",
+          8000
+        );
+      } else if (data.anonymousUserCreated) {
+        new Notice(
+          "A new account was created for this purchase. Your new API key has been saved.",
+          6000
+        );
+      }
+
       if (data.url) {
         window.location.href = data.url;
       }
-      onLicenseKeyChange(data.licenseKey);
+
+      // Save the new license key if provided
+      if (data.licenseKey) {
+        onLicenseKeyChange(data.licenseKey);
+      }
     } catch (error) {
       console.error("Top-up minutes error:", error);
+      new Notice("Failed to process top-up request", 5000);
     } finally {
       setLoading(false);
     }

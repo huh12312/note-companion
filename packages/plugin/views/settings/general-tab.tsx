@@ -5,6 +5,7 @@ import { logger } from "../../services/logger";
 import { UsageStats } from "../../components/usage-stats";
 import { TopUpCredits } from "../../views/settings/top-up-credits";
 import { AccountData } from "./account-data";
+import { validateApiKey } from "../../apiUtils";
 
 interface GeneralTabProps {
   plugin: FileOrganizer;
@@ -32,6 +33,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
   >(plugin.settings.API_KEY ? "checking" : "idle");
   const [usageData, setUsageData] = useState<UsageData | null>(null);
   const [isLoadingUsage, setIsLoadingUsage] = useState(false);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   // Check key status on mount if we have a key
   useEffect(() => {
@@ -84,6 +86,23 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
   const handleLicenseKeyChange = async (value: string) => {
     setLicenseKey(value);
     setKeyStatus("idle");
+    setValidationError(null);
+
+    // Validate key format before saving
+    const validation = validateApiKey(value);
+    if (!validation.isValid) {
+      setValidationError(validation.error || "Invalid API key format");
+      // Still save the value but mark as invalid
+      plugin.settings.API_KEY = value;
+      await plugin.saveSettings();
+      return;
+    }
+
+    // Warn if key seems too short but still allow it
+    if (validation.error) {
+      setValidationError(validation.error);
+    }
+
     plugin.settings.API_KEY = value;
     await plugin.saveSettings();
   };
@@ -182,7 +201,7 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
                 className={`flex-1 bg-[--background-primary] border rounded px-3 py-1.5 ${
                   keyStatus === "valid"
                     ? "border-[--text-success]"
-                    : keyStatus === "invalid"
+                    : keyStatus === "invalid" || validationError
                     ? "border-[--text-error]"
                     : "border-[--background-modifier-border]"
                 }`}
@@ -192,11 +211,17 @@ export const GeneralTab: React.FC<GeneralTabProps> = ({
               />
               <button
                 onClick={handleActivate}
-                className="bg-[--interactive-accent] text-[--text-on-accent] px-4 py-1.5 rounded hover:bg-[--interactive-accent-hover] transition-colors"
+                disabled={!licenseKey || !!validationError}
+                className="bg-[--interactive-accent] text-[--text-on-accent] px-4 py-1.5 rounded hover:bg-[--interactive-accent-hover] transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 Activate
               </button>
             </div>
+            {validationError && (
+              <div className="text-sm text-[--text-error] mt-1">
+                {validationError}
+              </div>
+            )}
             {getStatusIndicator()}
           </div>
         </div>

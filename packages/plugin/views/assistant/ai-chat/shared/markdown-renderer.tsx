@@ -12,7 +12,7 @@ interface MarkdownContentProps {
 export const MarkdownContent: React.FC<MarkdownContentProps> = ({
   content,
   className = "",
-  children
+  children,
 }) => {
   const contentRef = useRef<HTMLDivElement>(null);
   const plugin = usePlugin();
@@ -25,34 +25,34 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({
 
     const handleLinkClick = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
-      const linkEl = target.closest('a');
+      const linkEl = target.closest("a");
 
       if (!linkEl) return;
 
-      const href = linkEl.getAttribute('href');
+      const href = linkEl.getAttribute("href");
       if (!href) return;
 
-      if (href.startsWith('http://') || href.startsWith('https://')) {
+      if (href.startsWith("http://") || href.startsWith("https://")) {
         return;
       }
 
       e.preventDefault();
 
       let linktext = href;
-      if (href.startsWith('[[')) {
-        linktext = href.replace(/^\[\[/, '').replace(/\]\]$/, '');
+      if (href.startsWith("[[")) {
+        linktext = href.replace(/^\[\[/, "").replace(/\]\]$/, "");
       }
 
       plugin.app.workspace.openLinkText(
         linktext,
-        activeFile?.path || '',
+        activeFile?.path || "",
         e.ctrlKey || e.metaKey
       );
     };
 
-    contentRef.current.addEventListener('click', handleLinkClick);
+    contentRef.current.addEventListener("click", handleLinkClick);
     return () => {
-      contentRef.current?.removeEventListener('click', handleLinkClick);
+      contentRef.current?.removeEventListener("click", handleLinkClick);
     };
   }, [plugin.app, activeFile, contentRef.current]);
 
@@ -70,14 +70,14 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({
             plugin.app,
             content,
             tempContainer,
-            leaf.view.file?.path || '',
+            leaf.view.file?.path || "",
             leaf.view
           );
         } else {
           await MarkdownRenderer.renderMarkdown(
             content,
             tempContainer,
-            '',
+            "",
             plugin
           );
         }
@@ -95,14 +95,18 @@ export const MarkdownContent: React.FC<MarkdownContentProps> = ({
   // File tracking
   useEffect(() => {
     if (!plugin.app) return;
-    const updateActiveFile = () => setActiveFile(plugin.app.workspace.getActiveFile());
+    const updateActiveFile = () =>
+      setActiveFile(plugin.app.workspace.getActiveFile());
     updateActiveFile();
     const eventRef = plugin.app.workspace.on("file-open", updateActiveFile);
     return () => plugin.app.workspace.offref(eventRef);
   }, [plugin.app]);
 
   return (
-    <div className={`markdown-content-wrapper ${className}`} style={{ margin: 0, padding: 0 }}>
+    <div
+      className={`markdown-content-wrapper ${className}`}
+      style={{ margin: 0, padding: 0 }}
+    >
       {children}
       <div
         ref={contentRef}

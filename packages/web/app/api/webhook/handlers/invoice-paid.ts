@@ -8,6 +8,20 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2024-06-20',
 });
 
+/**
+ * Derives billing cycle from subscription interval
+ * Falls back to 'monthly' if interval cannot be determined
+ */
+function getBillingCycleFromSubscription(
+  subscription: Stripe.Subscription
+): 'monthly' | 'yearly' | 'lifetime' {
+  const interval = subscription.items.data[0]?.price?.recurring?.interval;
+  if (interval === 'year') return 'yearly';
+  if (interval === 'month') return 'monthly';
+  // Default to monthly if interval is unknown
+  return 'monthly';
+}
+
 async function resetUserUsageAndSetLastPayment(userId: string) {
   console.log('resetUserUsageAndSetLastPayment', userId);
   // Reset usage to 0 but set max tokens and audio transcription to monthly allotment
@@ -42,6 +56,7 @@ export const handleInvoicePaid = createWebhookHandler(
     // 3. invoice.metadata (fallback)
     let userId: string | undefined;
     let metadata: Record<string, string> | undefined;
+    let subscription: Stripe.Subscription | undefined;
 
     // Check parent.subscription_details.metadata first (where it actually is)
     // Note: parent is not in Stripe.Invoice type but exists in webhook payloads
@@ -64,9 +79,7 @@ export const handleInvoicePaid = createWebhookHandler(
           typeof invoice.subscription === 'string'
             ? invoice.subscription
             : invoice.subscription.id;
-        const subscription = await stripe.subscriptions.retrieve(
-          subscriptionId
-        );
+        subscription = await stripe.subscriptions.retrieve(subscriptionId);
         if (subscription.metadata?.userId) {
           metadata = subscription.metadata;
           userId = subscription.metadata.userId;
@@ -92,11 +105,32 @@ export const handleInvoicePaid = createWebhookHandler(
       };
     }
 
-    if (!metadata) {
-      return {
-        success: false,
-        message: 'No metadata found in invoice',
-      };
+    // Fetch subscription if we haven't already (needed to derive billingCycle)
+    if (!subscription && invoice.subscription) {
+      try {
+        const subscriptionId =
+          typeof invoice.subscription === 'string'
+            ? invoice.subscription
+            : invoice.subscription.id;
+        subscription = await stripe.subscriptions.retrieve(subscriptionId);
+      } catch (error) {
+        console.warn('Failed to fetch subscription:', error);
+      }
+    }
+
+    // Determine billingCycle: prefer metadata.type, fallback to subscription interval
+    let billingCycle: 'monthly' | 'yearly' | 'lifetime' = 'monthly'; // Safe default
+    if (metadata?.type) {
+      billingCycle = metadata.type as 'monthly' | 'yearly' | 'lifetime';
+    } else if (subscription) {
+      billingCycle = getBillingCycleFromSubscription(subscription);
+      console.log(
+        `Derived billingCycle from subscription interval: ${billingCycle}`
+      );
+    } else {
+      console.warn(
+        `No billingCycle found in metadata and no subscription available, defaulting to 'monthly'`
+      );
     }
 
     // Note: This sets subscription tokens but preserves remaining top-up tokens
@@ -108,12 +142,12 @@ export const handleInvoicePaid = createWebhookHandler(
         userId: userId,
         subscriptionStatus: invoice.status,
         paymentStatus: invoice.status,
-        billingCycle: metadata.type as 'monthly' | 'yearly' | 'lifetime',
+        billingCycle: billingCycle,
         maxTokenUsage: monthlyTokenLimit, // For new users, set to subscription limit
         maxAudioTranscriptionMinutes: 300, // 300 minutes per month for paid users
         lastPayment: new Date(),
-        currentProduct: metadata.product,
-        currentPlan: metadata.plan,
+        currentProduct: metadata?.product,
+        currentPlan: metadata?.plan,
       })
       .onConflictDoUpdate({
         target: [UserUsageTable.userId],
@@ -128,17 +162,16 @@ export const handleInvoicePaid = createWebhookHandler(
             )
           `,
           maxAudioTranscriptionMinutes: 300, // 300 minutes per month for paid users
-          billingCycle: metadata.type as 'monthly' | 'yearly' | 'lifetime',
+          billingCycle: billingCycle, // Always set billingCycle to avoid null constraint violation
           lastPayment: new Date(),
-          currentProduct: metadata.product,
-          currentPlan: metadata.plan,
+          currentProduct: metadata?.product,
+          currentPlan: metadata?.plan,
         },
       });
 
     // Only reset usage for monthly subscriptions
     // Yearly subscriptions get reset by the monthly cron job (they need monthly resets)
     // Lifetime subscriptions don't need resets
-    const billingCycle = metadata.type as 'monthly' | 'yearly' | 'lifetime';
     if (billingCycle === 'monthly') {
       await resetUserUsageAndSetLastPayment(userId);
     } else {

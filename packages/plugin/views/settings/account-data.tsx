@@ -4,6 +4,7 @@ import { TopUpMinutes } from "./top-up-minutes";
 import { logger } from "../../services/logger";
 import FileOrganizer from "../../index";
 import { Notice } from "obsidian";
+import { validateApiKey } from "../../apiUtils";
 
 interface AccountDataProps {
   plugin: FileOrganizer;
@@ -96,6 +97,13 @@ export const AccountData: React.FC<AccountDataProps> = ({
   };
 
   const handleDevTopUp = async () => {
+    // Validate API key before making request
+    const validation = validateApiKey(plugin.settings.API_KEY);
+    if (!validation.isValid) {
+      setError(validation.error || "Invalid API key");
+      return;
+    }
+
     try {
       setIsLoading(true);
       const tokens = parseInt(devTokens);
@@ -132,6 +140,13 @@ export const AccountData: React.FC<AccountDataProps> = ({
   };
 
   const handleDevTopUpMinutes = async () => {
+    // Validate API key before making request
+    const validation = validateApiKey(plugin.settings.API_KEY);
+    if (!validation.isValid) {
+      setError(validation.error || "Invalid API key");
+      return;
+    }
+
     try {
       setIsLoading(true);
       const minutes = parseInt(devMinutes);

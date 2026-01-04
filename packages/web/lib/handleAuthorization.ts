@@ -303,15 +303,36 @@ async function handleApiKeyAuth(
 
 async function handleClerkAuth(logger: ReturnType<typeof createLogger>) {
   logger.info('Attempting Clerk authentication');
-  const { userId } = await auth();
 
-  if (!userId) {
-    logger.error('Clerk authentication failed', null);
+  // Check if Clerk is configured before calling auth()
+  const hasClerkConfig =
+    !!process.env.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY &&
+    !!process.env.CLERK_SECRET_KEY;
+
+  if (!hasClerkConfig) {
+    logger.error('Clerk not configured, skipping Clerk authentication', null);
     return null;
   }
 
-  logger.info('Clerk authentication successful', { userId });
-  return userId;
+  try {
+    const { userId } = await auth();
+
+    if (!userId) {
+      logger.error('Clerk authentication failed', null);
+      return null;
+    }
+
+    logger.info('Clerk authentication successful', { userId });
+    return userId;
+  } catch (error) {
+    // Handle the case where auth() is called but clerkMiddleware isn't detected
+    // This can happen for static files or routes that bypass middleware
+    if (error instanceof Error && error.message.includes('clerkMiddleware')) {
+      logger.error('Clerk middleware not detected - route may be excluded from middleware', error);
+      return null;
+    }
+    throw error;
+  }
 }
 
 // Helper functions for user validation

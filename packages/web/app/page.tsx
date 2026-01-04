@@ -20,7 +20,19 @@ export default async function MainPage() {
     redirect('/dashboard/self-hosted');
   }
 
-  const { userId } = await auth();
+  let userId: string | null = null;
+  try {
+    const authResult = await auth();
+    userId = authResult.userId;
+  } catch (error) {
+    // Handle the case where auth() is called but clerkMiddleware isn't detected
+    // This can happen for static files or routes that bypass middleware
+    if (error instanceof Error && error.message.includes('clerkMiddleware')) {
+      console.warn('Clerk middleware not detected for this route, redirecting to self-hosted');
+      redirect('/dashboard/self-hosted');
+    }
+    throw error;
+  }
 
   const billingCycle = await getUserBillingCycle(userId);
   console.log('Billing cycle:', billingCycle);
