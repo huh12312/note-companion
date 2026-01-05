@@ -1,14 +1,177 @@
-# Note Companion (File Organizer 2000)
+# Note Companion (formerly File Organizer 2000)
 
-An AI-powered Obsidian plugin that automatically organizes, formats, and enhances your notes with intelligent features.
+Turn messy captures into clean, searchable notes — **transcribe audio/YouTube, chat with your vault, and auto-organize files** right inside Obsidian.
+Works with **Note Companion Cloud**, **your own AI API keys**, or **self-hosting**.
 
-## 📢 Important Disclosures
+> ✅ Best for: researchers, students, meeting-heavy workflows, and anyone with an "Inbox" full of unprocessed notes.
+
+---
+
+## What you can do
+
+- 🎬 **Transcribe YouTube videos** (multi-language, works even when captions aren't available in the usual way)
+- 🎙️ **Transcribe audio & video files** (handles large files reliably)
+- 🧠 **Chat with your notes** using vault context (mention files/folders/tags)
+- 🗂️ **Auto-organize & format notes** (folder/tag/title/template suggestions; optional "Inbox" automation)
+- 🧾 **Meeting recorder → Enhance note** (transcript, discussion points, action items, embedded audio)
+- 🔌 **Multiple AI providers**: OpenAI, Claude, Gemini, Groq, Ollama/local models, and custom base URLs
+- 🏠 **Self-hosting supported** (Docker + service examples)
+
+---
+
+## Screenshots
+
+![File Organization Interface](docs/screenshots/organizer-demo.gif)
+
+_AI-powered tags, folders, and formatting suggestions_
+
+![YouTube Transcription Workflow](docs/screenshots/youtube-demo.gif)
+
+_YouTube link → Transcript + Summary + Structured Notes_
+
+![AI Chat with Vault Context](docs/screenshots/chat-demo.gif)
+
+_Chat with your notes using @mentions for files, folders, and tags_
+
+![Meeting Recorder & Note Enhancement](docs/screenshots/meeting-demo.gif)
+
+_Record meetings, then enhance notes with transcript, discussion points, and action items_
+
+---
+
+## Install
+
+**Obsidian → Settings → Community plugins → Browse → "Note Companion" → Install → Enable**
+
+---
+
+## 60-second setup
+
+1. Open **Settings → Note Companion**
+2. Choose your mode:
+   - **Note Companion Cloud** (sign in at [notecompanion.ai](https://notecompanion.ai) and enter your license key)
+   - **Bring your own keys** (OpenAI / Claude / Gemini / etc. — paste your API key)
+   - **Self-hosted backend** (paste your Base URL + key if needed)
+3. Test it:
+   - Open Command Palette → **Note Companion: Open Chat**
+   - Ask: "Summarize this note and suggest tags"
+
+---
+
+## Quick workflows
+
+### 1) YouTube → Note
+
+1. Copy a YouTube link
+2. In **Note Companion Chat**, paste the link
+3. Get transcript + summary + optional structured notes
+
+### 2) Audio recording → Meeting note (best demo)
+
+1. Open **Meetings** tab → Start Recording
+2. Stop Recording → select a note → **Enhance Note**
+3. You'll get:
+   - embedded audio
+   - transcript
+   - discussion points + action items
+
+### 3) Inbox auto-organization
+
+1. Create an Inbox folder (configured in settings)
+2. Drop raw notes / links inside
+3. Note Companion suggests (or auto-applies) folder + tags + title + formatting
+
+---
+
+## Providers & privacy
+
+Note Companion can run using:
+
+- **Note Companion Cloud**, or
+- **Your own API keys** (OpenAI/Claude/Gemini/etc.), or
+- **Local/self-hosted models** (e.g., Ollama + custom base URL)
+
+Your data handling depends on the provider you choose.
+View our full privacy policy at [notecompanion.ai/privacy](https://notecompanion.ai/privacy)
+
+**Cloud Service:**
+
+- Files are processed through our secure API for AI analysis
+- Usage statistics collected for billing and rate limits
+- Your vault content remains private and is only processed when you explicitly use plugin features
+
+**Self-hosted / Your API Keys:**
+
+- All processing happens on your own infrastructure
+- Data never leaves your control
+- No usage tracking
+
+---
+
+## Self-hosting
+
+Want full control and local infrastructure?
+
+➡️ See **[SELF-HOSTING.md](SELF-HOSTING.md)** for Docker + service setups and security notes.
+
+---
+
+## Troubleshooting
+
+**If transcription fails:**
+
+- Check provider key, model availability, and file size limits
+- Verify API key is valid and has sufficient credits
+- For large files (>25MB), consider splitting or compressing
+
+**If YouTube import fails:**
+
+- Try a different fallback method
+- Ensure the video is accessible and not private/restricted
+- Check network connectivity
+
+**If local model doesn't respond:**
+
+- Verify Base URL and CORS/network settings
+- Ensure the local server (e.g., Ollama) is running
+- Check firewall settings
+
+**If plugin can't connect to server:**
+
+- Verify server URL in settings (check for typos)
+- Test connection using "Test Connection" button
+- Check firewall/network settings
+
+**If chat doesn't work:**
+
+- Verify API key is set correctly
+- Check model availability for your provider
+- Review error messages in plugin console (Settings → Note Companion → Advanced → Open Console)
+
+---
+
+## Support / feedback
+
+- **GitHub Issues**: [Report bugs or request features](https://github.com/Nexus-JPF/note-companion/issues)
+- **Documentation**: [notecompanion.ai/docs](https://notecompanion.ai/docs)
+- **Website**: [notecompanion.ai](https://notecompanion.ai)
+- **Obsidian Forum**: [Share feedback and discuss](https://forum.obsidian.md) _(add forum thread link when available)_
+
+---
+
+## For developers
+
+If you want to build or contribute, start here: **[CONTRIBUTING.md](CONTRIBUTING.md)**
+
+---
+
+## Important Disclosures
 
 ### Account & Payment Requirements
 
 - **Payment required for cloud service**: The plugin requires a paid subscription to use the cloud-hosted service
 - **7-day free trial**: New subscriptions include a 7-day trial period
-- **Self-hosting option available**: You can run your own instance for free (see [Self-Hosting Instructions](#-self-hosting) below)
+- **Self-hosting option available**: You can run your own instance for free (see [Self-Hosting](#self-hosting) above)
 - **Account creation**: Using the cloud service requires creating an account at [notecompanion.ai](https://notecompanion.ai)
 
 ### Network Usage
@@ -17,278 +180,10 @@ This plugin communicates with the following remote services:
 
 - **Note Companion API Server** (cloud service): For AI-powered features including file classification, formatting, transcription, and chat
 - **YouTube API**: For fetching video transcripts when processing YouTube links
-- **AI Provider APIs**: When self-hosting, you'll connect directly to your chosen AI provider (OpenAI, Anthropic, Google, etc.)
+- **AI Provider APIs**: When self-hosting or using your own keys, you'll connect directly to your chosen AI provider (OpenAI, Anthropic, Google, etc.)
 
-### Privacy & Data Handling
+---
 
-- **Cloud service**: Files are processed through our secure API for AI analysis
-- **Self-hosted**: All processing happens on your own server, data never leaves your control
-- Usage statistics are collected only for the cloud service to manage billing and rate limits
-- Your vault content remains private and is only processed when you explicitly use plugin features
-- View our full privacy policy at [notecompanion.ai/privacy](https://notecompanion.ai/privacy)
-
-## 🏗️ Project Structure
-
-This is a monorepo project managed with pnpm workspaces and Turborepo. The project consists of several packages:
-
-```
-note-companion/
-├── packages/
-│   ├── plugin/          # Obsidian plugin (TypeScript, React 19)
-│   ├── web/             # Web application (Next.js 15, React 19)
-│   ├── mobile/          # Mobile app (React Native, Expo SDK 52)
-│   └── landing/         # Marketing website (Next.js 15)
-├── memory/              # Project memory and learnings
-├── pnpm-workspace.yaml  # Workspace configuration
-└── turbo.json          # Turborepo configuration
-```
-
-## 📦 Package Details
-
-### `packages/plugin` - Obsidian Plugin
-
-The core Obsidian plugin that provides AI-powered note organization.
-
-**Tech Stack:**
-
-- TypeScript
-- React 19 for UI components
-- TailwindCSS (with `fo-` prefix to avoid conflicts)
-- Multiple AI provider support (OpenAI, Anthropic, Google, etc.)
-- Tiptap editor integration
-
-**Key Features:**
-
-- Automatic file organization based on AI classification
-- Custom AI prompt templates
-- Audio transcription
-- OCR for handwritten notes
-- YouTube video summaries
-- Context-aware AI chat
-- Atomic note generation
-
-### `packages/web` - Web Application
-
-The cloud backend and web interface for the plugin.
-
-**Tech Stack:**
-
-- Next.js 15.1.6 with App Router
-- React 19
-- Drizzle ORM with PostgreSQL (Vercel Postgres)
-- Clerk authentication
-- Stripe payments
-- AWS S3/R2 for file storage
-- TailwindCSS v4
-
-**Features:**
-
-- User account management
-- Subscription handling
-- AI API endpoints
-- File processing and storage
-- Settings synchronization
-
-### `packages/mobile` - Mobile Application
-
-Cross-platform mobile app for Note Companion.
-
-**Tech Stack:**
-
-- React Native with Expo SDK 52
-- NativeWind for styling
-- Clerk authentication
-- Shared functionality with web app
-
-### `packages/landing` - Landing Page
-
-Marketing website for Note Companion.
-
-**Tech Stack:**
-
-- Next.js 15.2.1
-- PostHog analytics
-- Framer Motion animations
-- Radix UI components
-
-## 🚀 Getting Started
-
-You have two options for using Note Companion:
-
-### Option 1: Cloud Service (Easiest)
-
-1. Install the plugin from Obsidian Community Plugins
-2. Sign up at [notecompanion.ai](https://notecompanion.ai)
-3. Start your 7-day free trial
-4. Enter your license key in the plugin settings
-
-### Option 2: Self-Hosting (Free, Technical)
-
-See the [Self-Hosting section](#-self-hosting) below for detailed instructions.
-
-## 🏠 Self-Hosting
-
-Self-hosting allows you to run Note Companion on your own server for free. You'll only need to provide your own AI API keys.
-
-### Quick Start
-
-1. **Clone and install:**
-
-```bash
-git clone https://github.com/Nexus-JPF/note-companion.git
-cd note-companion
-pnpm install
-```
-
-2. **Configure environment:**
-   Create a `.env` file in `packages/web` with:
-
-```env
-OPENAI_API_KEY=your_api_key_here
-```
-
-Get your API key from [platform.openai.com](https://platform.openai.com)
-
-3. **Build and start the server:**
-
-```bash
-cd packages/web
-pnpm build:self-host
-pnpm start
-```
-
-4. **Configure the plugin:**
-
-- In Obsidian, go to Note Companion settings
-- Enable "Self-hosting mode"
-- Set server URL to `http://localhost:3010`
-- Your plugin is now connected to your local server!
-
-For detailed instructions, troubleshooting, and advanced configuration, see [SELF-HOSTING.md](SELF-HOSTING.md).
-
-### Development Setup
-
-For development and contributing:
-
-#### Prerequisites
-
-- Node.js 18+
-- pnpm 10.8.1+
-- Git
-
-#### Installation
-
-1. Clone the repository:
-
-```bash
-git clone https://github.com/Nexus-JPF/note-companion.git
-cd note-companion
-```
-
-2. Install dependencies:
-
-```bash
-pnpm install
-```
-
-3. Set up environment variables:
-   - Copy `.env.example` files in each package to `.env.local`
-   - Configure your API keys and services
-
-### Development
-
-Run all packages in development mode:
-
-```bash
-pnpm dev
-```
-
-Run specific packages:
-
-```bash
-# Plugin development
-pnpm --filter plugin dev
-
-# Web app development (runs on port 3010)
-pnpm --filter web dev
-
-# Mobile app
-pnpm --filter mobile start
-```
-
-### Building
-
-Build all packages:
-
-```bash
-pnpm build
-```
-
-Build specific package:
-
-```bash
-pnpm --filter plugin build
-```
-
-## 🏭 Architecture
-
-### Core Workflow
-
-1. **Inbox Processing**: Users place files in a designated "inbox" folder
-2. **AI Classification**: The plugin analyzes files and determines appropriate organization
-3. **Automatic Filing**: Files are moved to appropriate folders based on classification
-4. **Enhancement**: Notes are enhanced with formatting, tags, and metadata
-
-### AI Integration
-
-### Deployment Options
-
-1. **Cloud Service**: Managed subscription service
-2. **Self-Hosted**: Run your own instance
-3. **Local Development**: Full local setup for development
-
-## 🛠️ Development Guidelines
-
-### Code Style
-
-- TypeScript for type safety
-- React 19 for UI components
-- TailwindCSS with `fo-` prefix in plugin
-- Follow existing patterns and conventions
-
-### Testing
-
-- Unit tests with Jest (web package)
-- Playwright for E2E testing (web/landing)
-- Manual testing for Obsidian plugin
-
-### Git Workflow
-
-- Use descriptive commit messages
-- Create feature branches
-- Submit PRs for review
-- Run linting before committing
-
-## 📝 Documentation
-
-- `/CLAUDE.md` - AI assistant instructions
-- `/memory/` - Project learnings and decisions
-- Package-specific READMEs in each package directory
-
-## 🤝 Contributing
-
-1. Fork the repository
-2. Create your feature branch
-3. Commit your changes
-4. Push to the branch
-5. Open a Pull Request
-
-## 📄 License
+## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🔗 Links
-
-- [Website](https://notecompanion.ai)
-- [Documentation](https://notecompanion.ai/docs) (redirects to GitHub)
-- [GitHub Issues](https://github.com/Nexus-JPF/note-companion/issues)
