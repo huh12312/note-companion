@@ -10,7 +10,7 @@ const tagsSchema = z.object({
     score: z.number().min(0).max(100),
     isNew: z.boolean(),
     tag: z.string(),
-    reason: z.string(),
+    reason: z.string().min(1), // Ensure reason is not empty
   }))
 });
 
@@ -36,8 +36,11 @@ export async function POST(request: NextRequest) {
               - Prefer existing tags when appropriate (score them higher)
               - Create specific, meaningful new tags when needed
               - Score based on relevance (0-100)
-              - Include brief reasoning for each tag
-              - Focus on key themes, topics, and document type`,
+              - REQUIRED: Each tag MUST include a "reason" field explaining why it's relevant
+              - The reason should be a brief sentence (1-2 sentences) explaining the tag's relevance
+              - Focus on key themes, topics, and document type
+
+              Response format: Each tag object must have: score (number), isNew (boolean), tag (string), and reason (string).`,
       prompt: `File: "${fileName}"
 
               Content: """
@@ -48,11 +51,13 @@ export async function POST(request: NextRequest) {
     await incrementAndLogTokenUsage(userId, response.usage.totalTokens);
 
     // Sort tags by score and format response
+    // Add fallback reason if missing (defensive programming)
     const sortedTags = response.object.suggestedTags
       .sort((a, b) => b.score - a.score)
       .map(tag => ({
         ...tag,
         tag: tag.tag.startsWith('#') ? tag.tag : `#${tag.tag}`,
+        reason: tag.reason || `Relevant to content theme`, // Fallback if reason is missing
       }));
 
     return NextResponse.json({ tags: sortedTags });

@@ -105,15 +105,6 @@ export default clerkMiddleware(async (auth, req) => {
     return baseResponse;
   }
 
-  // Skip static files - don't run Clerk auth on them
-  // But allow /config.js through if it needs to call auth()
-  if (
-    isStaticFile(req.nextUrl.pathname) &&
-    req.nextUrl.pathname !== '/config.js'
-  ) {
-    return NextResponse.next();
-  }
-
   // If Clerk isn't configured, don't call auth() - just pass through
   // This prevents the "clerkMiddleware not detected" error
   if (
@@ -126,12 +117,50 @@ export default clerkMiddleware(async (auth, req) => {
     if (isSoloInstance) {
       return soloApiKeyMiddleware(req);
     }
+    // For static files when Clerk isn't configured, just return early
+    if (
+      isStaticFile(req.nextUrl.pathname) &&
+      req.nextUrl.pathname !== '/config.js'
+    ) {
+      return NextResponse.next();
+    }
+    return NextResponse.next();
+  }
+
+  // Skip static files - don't run Clerk auth on them
+  // BUT: Initialize Clerk's context first so auth() can be called if needed
+  // This prevents "clerkMiddleware not detected" errors for static file routes
+  if (
+    isStaticFile(req.nextUrl.pathname) &&
+    req.nextUrl.pathname !== '/config.js'
+  ) {
+    try {
+      // Initialize Clerk context by calling auth() - we don't enforce auth for static files
+      // This ensures auth() can be called in layouts/components without errors
+      await auth();
+    } catch (error) {
+      // If Clerk initialization fails, just continue - static files don't need auth
+      // This prevents middleware from breaking if Clerk config is missing
+    }
     return NextResponse.next();
   }
 
   // Handle public routes - always allow through without auth
+  // BUT: For API routes, we still need to initialize Clerk's context
+  // so that auth() can be called in route handlers without errors
   if (isPublicRoute(req)) {
     console.log('isPublicRoute');
+    // For API routes, initialize Clerk context by calling auth() (even if we don't use it)
+    // This ensures auth() can be called in route handlers without "clerkMiddleware not detected" errors
+    if (isApiRoute(req)) {
+      try {
+        // Initialize Clerk context by calling auth() - we don't enforce auth for public routes
+        await auth();
+      } catch (error) {
+        // If Clerk isn't properly configured, just continue - route handlers will handle it
+        // This prevents middleware from breaking if Clerk config is missing
+      }
+    }
     return NextResponse.next();
   }
 
