@@ -434,13 +434,26 @@ export async function POST(req: NextRequest) {
           console.log(`Search grounding enabled (deep: ${deepSearch})`);
 
           // Filter out pending tool invocations before converting
+          // Only include tool invocations that have results (exclude any in "call" state)
           const messagesWithResults = messages.map((message: any) => {
             if (message.role === 'assistant' && message.toolInvocations) {
               return {
                 ...message,
                 toolInvocations: message.toolInvocations.filter(
-                  (invocation: any) =>
-                    'result' in invocation || invocation.state === 'result'
+                  (invocation: any) => {
+                    // CRITICAL: Exclude ALL tool invocations in "call" state
+                    // Tool invocations in "call" state are pending and don't have results yet
+                    // convertToCoreMessages requires all tool invocations to have results
+                    if (invocation.state === 'call') {
+                      return false;
+                    }
+                    // Include invocations that have a result (not null/undefined) or are in "result" state
+                    // Also include invocations without a state property if they have a result
+                    return (
+                      ('result' in invocation && invocation.result != null) ||
+                      invocation.state === 'result'
+                    );
+                  }
                 ),
               };
             }
@@ -521,13 +534,26 @@ export async function POST(req: NextRequest) {
           }
 
           // Filter out pending tool invocations before converting
+          // Only include tool invocations that have results (exclude any in "call" state)
           const messagesWithResults = messages.map((message: any) => {
             if (message.role === 'assistant' && message.toolInvocations) {
               return {
                 ...message,
                 toolInvocations: message.toolInvocations.filter(
-                  (invocation: any) =>
-                    'result' in invocation || invocation.state === 'result'
+                  (invocation: any) => {
+                    // CRITICAL: Exclude ALL tool invocations in "call" state
+                    // Tool invocations in "call" state are pending and don't have results yet
+                    // convertToCoreMessages requires all tool invocations to have results
+                    if (invocation.state === 'call') {
+                      return false;
+                    }
+                    // Include invocations that have a result (not null/undefined) or are in "result" state
+                    // Also include invocations without a state property if they have a result
+                    return (
+                      ('result' in invocation && invocation.result != null) ||
+                      invocation.state === 'result'
+                    );
+                  }
                 ),
               };
             }
