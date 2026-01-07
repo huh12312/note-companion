@@ -20,7 +20,7 @@ This guide will help you set up your own instance of Note Companion, allowing yo
 - **Git** for cloning the repository
 - **AI API Key** from at least one provider (OpenAI recommended for best results)
 - **4GB RAM** minimum on your server/computer
-- **Port 3010** available (or configure a different port)
+- **Port 3000** available for production (or configure a different port)
 
 ## Quick Setup
 
@@ -45,7 +45,7 @@ pnpm build:self-host
 pnpm start
 ```
 
-Your server will be running at `http://localhost:3010`
+Your server will be running at `http://localhost:3000` (or the port specified in the `PORT` environment variable)
 
 ## Detailed Installation
 
@@ -81,9 +81,17 @@ OPENAI_API_BASE=http://localhost:11434/v1  # Use this for local Ollama instances
 ANTHROPIC_API_KEY=sk-ant-...your_key_here...
 GOOGLE_GENERATIVE_AI_API_KEY=...your_key_here...
 GROQ_API_KEY=gsk_...your_key_here...
+MISTRAL_API_KEY=...your_key_here...
+DEEPSEEK_API_KEY=...your_key_here...
+
+# Optional: AI Model Configuration (for self-hosting with custom providers)
+# If not set, defaults to OpenAI with gpt-4o-mini (backward compatible)
+MODEL_PROVIDER=openai  # Options: openai, anthropic, google, groq, mistral, deepseek
+MODEL_NAME=gpt-4o-mini  # Model name for the selected provider
+RESPONSES_MODEL_NAME=gpt-4o-mini  # Optional: Model for Responses API (OpenAI only, defaults to MODEL_NAME)
 
 # Optional: Server configuration
-PORT=3010  # Change if needed (now properly respected in production mode)
+PORT=3000  # Default is 3000 for production (3010 is used in development mode with `pnpm dev`)
 NODE_ENV=production
 
 # Optional: For OCR features (handwriting recognition)
@@ -122,12 +130,12 @@ This command:
 pnpm start
 ```
 
-The server will start on port 3010 by default. You should see:
+The server will start on port 3000 by default (or the port specified in the `PORT` environment variable). You should see:
 
 ```
 ▲ Next.js 15.x.x
-- Local:        http://localhost:3010
-- Network:      http://[your-ip]:3010
+- Local:        http://localhost:3000
+- Network:      http://[your-ip]:3000
 ✓ Ready
 ```
 
@@ -137,8 +145,8 @@ The server will start on port 3010 by default. You should see:
 2. Scroll to "Advanced Settings"
 3. Enable "Self-hosting mode"
 4. Set the server URL:
-   - For local machine: `http://localhost:3010`
-   - For network access: `http://[your-server-ip]:3010`
+   - For local machine: `http://localhost:3000` (or `http://localhost:3010` if you set `PORT=3010`)
+   - For network access: `http://[your-server-ip]:3000` (or the port you configured)
    - For domain with SSL: `https://your-domain.com`
 5. Click "Test Connection" to verify
 
@@ -146,7 +154,7 @@ The server will start on port 3010 by default. You should see:
 
 ### Using Different Ports
 
-If port 3010 is occupied, you can use a different port:
+If port 3000 is occupied, you can use a different port:
 
 ```env
 PORT=8080
@@ -196,7 +204,7 @@ RUN npm install -g pnpm
 RUN pnpm install
 WORKDIR /app/packages/web
 RUN pnpm build:self-host
-EXPOSE 3010
+EXPOSE 3000
 CMD ["pnpm", "start"]
 ```
 
@@ -204,7 +212,7 @@ Build and run:
 
 ```bash
 docker build -t note-companion .
-docker run -p 3010:3010 --env-file packages/web/.env note-companion
+docker run -p 3000:3000 --env-file packages/web/.env note-companion
 ```
 
 ### Using PM2 (Process Manager)
@@ -258,6 +266,50 @@ Fastest inference, good for quick processing.
 - Features: Basic text processing
 - Cost: Very competitive
 
+### Mistral
+
+Good performance with competitive pricing.
+
+- Models: Mistral Large, Mistral Medium, Mistral Small
+- Features: All text features
+- Cost: Competitive
+
+### DeepSeek
+
+Cost-effective option with good performance.
+
+- Models: DeepSeek Chat, DeepSeek Coder
+- Features: All text features
+- Cost: Very competitive
+
+### Configuring Different Providers
+
+To use a provider other than OpenAI, set the following environment variables:
+
+```env
+# Example: Using Groq
+MODEL_PROVIDER=groq
+MODEL_NAME=llama-3.1-70b-versatile
+GROQ_API_KEY=gsk_...your_key_here...
+
+# Example: Using Anthropic
+MODEL_PROVIDER=anthropic
+MODEL_NAME=claude-3-5-sonnet-20241022
+ANTHROPIC_API_KEY=sk-ant-...your_key_here...
+
+# Example: Using Google
+MODEL_PROVIDER=google
+MODEL_NAME=gemini-pro
+GOOGLE_GENERATIVE_AI_API_KEY=...your_key_here...
+```
+
+**Important Notes:**
+
+- If `MODEL_PROVIDER` is not set, the system defaults to OpenAI (backward compatible)
+- Web search features (Responses API) are only available with OpenAI
+- Make sure you have the corresponding API key set for your chosen provider
+- Restart the server after changing these environment variables
+
 ### Local Models (Ollama)
 
 Run models completely offline using Ollama or other OpenAI-compatible local LLM servers.
@@ -280,7 +332,7 @@ Run models completely offline using Ollama or other OpenAI-compatible local LLM 
 
 #### "Cannot connect to server"
 
-- Verify the server is running: `curl http://localhost:3010/api/health`
+- Verify the server is running: `curl http://localhost:3000/api/health` (or the port you configured)
 - Check firewall settings
 - Ensure the URL in plugin settings is correct
 
@@ -341,7 +393,7 @@ pnpm build:self-host
 
 ### Network Security
 
-1. **Firewall**: Only expose port 3010 to trusted networks
+1. **Firewall**: Only expose port 3000 (or your configured port) to trusted networks
 2. **HTTPS**: Use a reverse proxy (nginx/Caddy) with SSL for internet access
 3. **Authentication**: The self-hosted version doesn't include authentication by default
 
@@ -365,7 +417,7 @@ server {
     ssl_certificate_key /path/to/key.pem;
 
     location / {
-        proxy_pass http://localhost:3010;
+        proxy_pass http://localhost:3000;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection 'upgrade';

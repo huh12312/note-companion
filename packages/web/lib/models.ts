@@ -1,31 +1,75 @@
-import { createOpenAI } from '@ai-sdk/openai';
+import { openai, createOpenAI } from '@ai-sdk/openai';
+import { google } from '@ai-sdk/google';
+import { anthropic } from '@ai-sdk/anthropic';
+import { groq } from '@ai-sdk/groq';
+import { mistral } from '@ai-sdk/mistral';
+import { deepseek } from '@ai-sdk/deepseek';
 import { LanguageModel } from 'ai';
 
-// Create OpenAI provider with configurable baseURL for local LLM support
-const openaiProvider = createOpenAI({
-  apiKey: process.env.OPENAI_API_KEY || '',
-  baseURL: process.env.OPENAI_API_BASE || 'https://api.openai.com/v1',
-});
+// Get model configuration from environment variables
+// Defaults to OpenAI for backward compatibility with cloud environment
+const MODEL_PROVIDER = (process.env.MODEL_PROVIDER || 'openai').toLowerCase();
+const MODEL_NAME = process.env.MODEL_NAME || 'gpt-4o-mini';
+const RESPONSES_MODEL_NAME = process.env.RESPONSES_MODEL_NAME || MODEL_NAME;
 
-// Always use gpt-4o-mini - ignore any model parameter from client
-// Note: Using gpt-4o-mini for compatibility with @ai-sdk/openai v1.2.2
-// gpt-4.1-mini is essentially the same model (just a newer name)
-const DEFAULT_MODEL = openaiProvider('gpt-4o-mini');
+/**
+ * Get the model instance based on environment configuration
+ */
+function createModel(provider: string, modelName: string): LanguageModel {
+  switch (provider) {
+    case 'google':
+      return google(modelName) as LanguageModel;
+
+    case 'anthropic':
+      return anthropic(modelName) as LanguageModel;
+
+    case 'groq':
+      return groq(modelName) as LanguageModel;
+
+    case 'mistral':
+      return mistral(modelName) as LanguageModel;
+
+    case 'deepseek':
+      return deepseek(modelName) as LanguageModel;
+
+    case 'openai':
+    default:
+      // Support custom baseURL for local LLMs (e.g., Ollama)
+      if (process.env.OPENAI_API_BASE) {
+        const customProvider = createOpenAI({
+          apiKey: process.env.OPENAI_API_KEY || '',
+          baseURL: process.env.OPENAI_API_BASE,
+        });
+        return customProvider(modelName) as LanguageModel;
+      }
+      return openai(modelName) as LanguageModel;
+  }
+}
+
+// Create model instances based on environment variables
+const DEFAULT_MODEL = createModel(MODEL_PROVIDER, MODEL_NAME);
+
+// Responses API is OpenAI-specific, so only use it for OpenAI
+// For other providers, fall back to regular model
+const DEFAULT_RESPONSES_MODEL =
+  MODEL_PROVIDER === 'openai'
+    ? ((openai.responses
+        ? openai.responses(RESPONSES_MODEL_NAME)
+        : openai(RESPONSES_MODEL_NAME)) as LanguageModel)
+    : createModel(MODEL_PROVIDER, RESPONSES_MODEL_NAME);
 
 /**
  * Get the default model for chat completion
  * Note: We ignore any model parameter from the client to ensure consistency
  */
 export const getModel = (_name?: string): LanguageModel => {
-  return DEFAULT_MODEL as LanguageModel;
+  return DEFAULT_MODEL;
 };
 
 /**
  * Get the default model with Responses API (supports web search)
- * Note: In v1.2.2, responses() may not be available, so we use the regular model
+ * Note: Responses API is only available for OpenAI models
  */
 export const getResponsesModel = (): LanguageModel => {
-  // In v1.2.2, responses() might not exist, so use regular model
-  // The Responses API features may not be available in this version
-  return DEFAULT_MODEL as LanguageModel;
+  return DEFAULT_RESPONSES_MODEL;
 };
