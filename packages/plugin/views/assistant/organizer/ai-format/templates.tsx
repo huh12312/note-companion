@@ -14,6 +14,7 @@ interface ClassificationBoxProps {
   file: TFile | null;
   content: string;
   refreshKey: number;
+  onFileRename?: (newFile: TFile) => void;
 }
 
 export const ClassificationContainer: React.FC<ClassificationBoxProps> = ({
@@ -21,6 +22,7 @@ export const ClassificationContainer: React.FC<ClassificationBoxProps> = ({
   file,
   content,
   refreshKey,
+  onFileRename,
 }) => {
   const [formatBehavior, setFormatBehavior] = React.useState<
     "override" | "newFile" | "append"
@@ -158,8 +160,11 @@ export const ClassificationContainer: React.FC<ClassificationBoxProps> = ({
                   targetFile = file; // Fallback to original if rename failed
                   console.warn("[YouTube Format] Rename failed: targetFile not found after rename");
                 } else {
-                  console.log("[YouTube Format] Successfully renamed file:", newFileName);
                   logger.info(`Renamed file to match video title: ${newFileName}`);
+                  // Notify parent component about the rename
+                  if (onFileRename) {
+                    onFileRename(targetFile);
+                  }
                 }
               } else {
                 // File with that name already exists - try to find a unique name
@@ -189,8 +194,11 @@ export const ClassificationContainer: React.FC<ClassificationBoxProps> = ({
                     targetFile = file;
                     console.warn("[YouTube Format] Rename failed: targetFile not found after rename");
                   } else {
-                    console.log("[YouTube Format] Successfully renamed file with unique name:", uniquePath);
                     logger.info(`Renamed file to match video title: ${uniquePath}`);
+                    // Notify parent component about the rename
+                    if (onFileRename) {
+                      onFileRename(targetFile);
+                    }
                   }
                 } else {
                   console.warn("[YouTube Format] Cannot rename: too many duplicate files exist");

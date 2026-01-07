@@ -1,5 +1,5 @@
 import * as React from "react";
-import { TFile, WorkspaceLeaf, Notice } from "obsidian";
+import { TFile, WorkspaceLeaf, Notice, TAbstractFile } from "obsidian";
 import FileOrganizer from "../../../index";
 import { debounce } from "lodash";
 
@@ -39,6 +39,11 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
   const [isLicenseValid, setIsLicenseValid] = React.useState(false);
   const [isConnected, setIsConnected] = React.useState(true);
 
+  // Use refs to track the active file and path for rename detection
+  const activeFilePathRef = React.useRef<string | null>(null);
+  const activeFileRef = React.useRef<TFile | null>(null);
+  const isRenamingRef = React.useRef<boolean>(false);
+
   const isMediaFile = React.useMemo(
     () => checkIfIsMediaFile(activeFile),
     [activeFile]
@@ -53,6 +58,11 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
   );
 
   const updateActiveFile = React.useCallback(async () => {
+    // Skip if we're in the middle of a rename operation
+    if (isRenamingRef.current) {
+      return;
+    }
+
     logMessage("updating active file");
     // Check if the Assistant view is visible before processing
     const isVisible =
@@ -67,6 +77,9 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
         setNoteContent(content);
       }
       setActiveFile(file);
+      // Update the refs when active file changes
+      activeFileRef.current = file;
+      activeFilePathRef.current = file ? file.path : null;
     } catch (err) {
       logger.error("Error updating active file:", err);
       setError("Failed to load file content");
@@ -84,26 +97,94 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
     updateActiveFile();
     const debouncedUpdate = debounce(updateActiveFile, 300);
 
+    // Handle file rename - update activeFile if the current file was renamed
+    const handleRename = (file: TAbstractFile, oldPath: string) => {
+      if (!(file instanceof TFile)) return;
+
+      // Check if the renamed file is the currently active file
+      const currentActiveFile = plugin.app.workspace.getActiveFile();
+      const storedPath = activeFilePathRef.current;
+
+      // Check multiple conditions to detect if this rename affects the active file:
+      // 1. Stored ref path matches old path (most reliable)
+      // 2. Workspace active file matches new path AND we have a stored path that matches old path
+      // 3. Workspace active file matches new path AND stored path is null (initial load case)
+      const isActiveFileRenamed =
+        storedPath === oldPath || // Primary check: stored path matches old path
+        (currentActiveFile &&
+          currentActiveFile.path === file.path &&
+          (storedPath === oldPath || !storedPath)); // Secondary check: workspace updated and we can verify
+
+      if (isActiveFileRenamed) {
+        logger.info("Detected rename of active file:", {
+          oldPath,
+          newPath: file.path,
+          storedPath,
+          currentActivePath: currentActiveFile?.path,
+        });
+        // This rename affects the active file - update the state immediately
+        setActiveFile(file);
+        activeFileRef.current = file;
+        activeFilePathRef.current = file.path; // Update the ref with new path
+
+        // Also refresh the active file to ensure we have the latest reference
+        // Use a small delay to ensure Obsidian has fully processed the rename
+        setTimeout(() => {
+          updateActiveFile();
+        }, 100);
+      } else {
+        // Fallback: Check if workspace active file path differs from our state
+        // This handles cases where the rename event fires but our stored path check fails
+        const stateActiveFile = activeFileRef.current;
+        if (
+          currentActiveFile &&
+          currentActiveFile.path === file.path &&
+          stateActiveFile &&
+          stateActiveFile.path !== file.path
+        ) {
+          logger.info(
+            "Detected active file path mismatch after rename, updating:",
+            {
+              statePath: stateActiveFile.path,
+              workspacePath: currentActiveFile.path,
+              renamedPath: file.path,
+            }
+          );
+          // Update to match workspace
+          setActiveFile(file);
+          activeFileRef.current = file;
+          activeFilePathRef.current = file.path;
+          setTimeout(() => {
+            updateActiveFile();
+          }, 100);
+        }
+      }
+    };
+
     // Attach event listeners
     plugin.app.workspace.on("file-open", debouncedUpdate);
     plugin.app.workspace.on("active-leaf-change", debouncedUpdate);
+    plugin.app.vault.on("rename", handleRename);
 
     // Cleanup function to remove event listeners
     return () => {
       plugin.app.workspace.off("file-open", debouncedUpdate);
       plugin.app.workspace.off("active-leaf-change", debouncedUpdate);
+      plugin.app.vault.off("rename", handleRename);
       debouncedUpdate.cancel();
     };
-  }, [updateActiveFile, plugin.app.workspace]);
+  }, [updateActiveFile, plugin.app.workspace, plugin.app.vault]);
 
   const refreshContext = React.useCallback(() => {
     setRefreshKey(prevKey => prevKey + 1);
     setError(null);
-    
+
     // Force reset the state variables that determine what's displayed
     setActiveFile(null);
+    activeFileRef.current = null;
+    activeFilePathRef.current = null;
     setNoteContent("");
-    
+
     // Then update the active file with fresh checks
     setTimeout(() => {
       updateActiveFile();
@@ -138,7 +219,11 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
   if (!isLicenseValid) {
     return (
       <div className={tw("flex flex-col h-full")}>
-        <div className={tw("flex gap-2 items-center px-3 py-2 border-b border-[--background-modifier-border]")}>
+        <div
+          className={tw(
+            "flex gap-2 items-center px-3 py-2 border-b border-[--background-modifier-border]"
+          )}
+        >
           <RefreshButton onRefresh={refreshContext} />
         </div>
         <div className={tw("px-3")}>
@@ -155,7 +240,11 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
   if (error) {
     return (
       <div className={tw("flex flex-col h-full")}>
-        <div className={tw("flex gap-2 items-center px-3 py-2 border-b border-[--background-modifier-border]")}>
+        <div
+          className={tw(
+            "flex gap-2 items-center px-3 py-2 border-b border-[--background-modifier-border]"
+          )}
+        >
           <RefreshButton onRefresh={refreshContext} />
         </div>
         <div className={tw("px-3")}>
@@ -172,7 +261,11 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
   if (!activeFile) {
     return (
       <div className={tw("flex flex-col h-full")}>
-        <div className={tw("flex gap-2 items-center px-3 py-2 border-b border-[--background-modifier-border]")}>
+        <div
+          className={tw(
+            "flex gap-2 items-center px-3 py-2 border-b border-[--background-modifier-border]"
+          )}
+        >
           <RefreshButton onRefresh={refreshContext} />
         </div>
         <div className={tw("px-3")}>
@@ -181,11 +274,15 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
       </div>
     );
   }
-  
+
   if (isInIgnoredPatterns) {
     return (
       <div className={tw("flex flex-col h-full")}>
-        <div className={tw("flex gap-2 items-center px-3 py-2 border-b border-[--background-modifier-border]")}>
+        <div
+          className={tw(
+            "flex gap-2 items-center px-3 py-2 border-b border-[--background-modifier-border]"
+          )}
+        >
           <RefreshButton onRefresh={refreshContext} />
         </div>
         <div className={tw("px-3")}>
@@ -198,7 +295,11 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
   if (isMediaFile) {
     return (
       <div className={tw("flex flex-col h-full")}>
-        <div className={tw("flex gap-2 items-center px-3 py-2 border-b border-[--background-modifier-border]")}>
+        <div
+          className={tw(
+            "flex gap-2 items-center px-3 py-2 border-b border-[--background-modifier-border]"
+          )}
+        >
           <RefreshButton onRefresh={refreshContext} />
         </div>
         <div className={tw("px-3")}>
@@ -207,11 +308,15 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
       </div>
     );
   }
-  
+
   if (!noteContent.trim()) {
     return (
       <div className={tw("flex flex-col h-full")}>
-        <div className={tw("flex gap-2 items-center px-3 py-2 border-b border-[--background-modifier-border]")}>
+        <div
+          className={tw(
+            "flex gap-2 items-center px-3 py-2 border-b border-[--background-modifier-border]"
+          )}
+        >
           <RefreshButton onRefresh={refreshContext} />
         </div>
         <div className={tw("px-3")}>
@@ -230,9 +335,17 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
   return (
     <div className={tw("flex flex-col h-full overflow-y-auto")}>
       {/* Compact header - flush to edges */}
-      <div className={tw("flex gap-2 items-center px-3 py-2 border-b border-[--background-modifier-border] bg-[--background-primary] sticky top-0 z-10")}>
+      <div
+        className={tw(
+          "flex gap-2 items-center px-3 py-2 border-b border-[--background-modifier-border] bg-[--background-primary] sticky top-0 z-10"
+        )}
+      >
         <RefreshButton onRefresh={refreshContext} />
-        <div className={tw("text-xs text-[--text-normal] font-medium truncate")}>{activeFile.basename}</div>
+        <div
+          className={tw("text-xs text-[--text-normal] font-medium truncate")}
+        >
+          {activeFile.basename}
+        </div>
       </div>
 
       {/* Content sections - consistent padding with other tabs */}
@@ -243,6 +356,44 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
             file={activeFile}
             content={noteContent}
             refreshKey={refreshKey}
+            onFileRename={async newFile => {
+              // Set flag to prevent updateActiveFile from interfering
+              isRenamingRef.current = true;
+
+              // Update refs first
+              activeFileRef.current = newFile;
+              activeFilePathRef.current = newFile.path;
+
+              // Then update state
+              setActiveFile(newFile);
+
+              // Also update the content to ensure everything is in sync
+              try {
+                const content = await plugin.app.vault.read(newFile);
+                setNoteContent(content);
+              } catch (err) {
+                logger.error("Error reading renamed file content:", err);
+              }
+
+              // Force a refresh of all child components
+              setRefreshKey(prev => prev + 1);
+
+              // Clear the flag after a delay to allow other updates
+              setTimeout(() => {
+                isRenamingRef.current = false;
+                // Verify state is correct, fix if needed
+                const currentActive = plugin.app.workspace.getActiveFile();
+                if (
+                  currentActive &&
+                  currentActive.path === newFile.path &&
+                  activeFileRef.current?.path !== newFile.path
+                ) {
+                  setActiveFile(newFile);
+                  activeFileRef.current = newFile;
+                  activeFilePathRef.current = newFile.path;
+                }
+              }, 500);
+            }}
           />,
           "Error loading classification"
         )}
@@ -288,7 +439,11 @@ export const AssistantView: React.FC<AssistantViewProps> = ({
           <>
             <SectionHeader text="Atomic notes" icon="✂️ " />
             {renderSection(
-              <AtomicNotes plugin={plugin} activeFile={activeFile} refreshKey={refreshKey} />,
+              <AtomicNotes
+                plugin={plugin}
+                activeFile={activeFile}
+                refreshKey={refreshKey}
+              />,
               "Error loading atomic notes"
             )}
           </>

@@ -29,6 +29,7 @@ import {
 import { TFile, Notice } from "obsidian";
 import { ProcessingTimeline } from "./organizer/components/processing-timeline";
 import { UndoButton } from "./organizer/components/undo-button";
+import { RecentIssuesPanel } from "./inbox-logs/recent-issues-panel";
 
 // Enhanced log entry display component
 const LogEntryDisplay: React.FC<{ entry: LogEntry; step: Action }> = ({
@@ -892,6 +893,9 @@ export const InboxLogs: React.FC = () => {
           <InboxAnalytics analytics={analytics} />
         </div>
       )}
+
+      {/* Recent Issues Panel - NEW */}
+      <RecentIssuesPanel plugin={plugin} />
 
       {/* Search bar - flush */}
       <div className="border-b border-[--background-modifier-border] px-3 py-2">
