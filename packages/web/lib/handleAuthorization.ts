@@ -54,13 +54,38 @@ export const getToken = (req: NextRequest) => {
   // Check both lowercase and original case
   const header =
     req.headers.get('authorization') || req.headers.get('Authorization');
-  const token = header?.replace(/^Bearer\s+/i, '');
+
+  if (!header) {
+    return null;
+  }
+
+  // More robust token extraction - handle various formats
+  // Remove "Bearer " prefix (case-insensitive, with optional whitespace)
+  const token = header.replace(/^Bearer\s+/i, '').trim();
+
   console.log('[getToken] Header check:', {
     hasAuthHeader: !!header,
     headerPrefix: header ? header.substring(0, 20) : 'none',
-    extractedToken: token ? token.substring(0, 10) + '...' : 'none',
+    headerLength: header.length,
+    extractedTokenLength: token?.length || 0,
+    extractedTokenPrefix: token ? token.substring(0, 10) + '...' : 'none',
+    // Log if token still contains "Bearer" (indicates extraction issue)
+    tokenStillHasBearer: token?.toLowerCase().includes('bearer'),
   });
-  return token;
+
+  // If token still contains "Bearer", try alternative extraction
+  if (token && token.toLowerCase().startsWith('bearer')) {
+    console.warn(
+      '[getToken] Token extraction may have failed, token still contains "Bearer"'
+    );
+    // Try splitting by space and taking the last part
+    const parts = header.split(/\s+/);
+    if (parts.length > 1) {
+      return parts[parts.length - 1].trim();
+    }
+  }
+
+  return token || null;
 };
 
 // Make sure tier configurations exist
@@ -128,6 +153,11 @@ async function handleApiKeyAuth(
   console.log('[handleApiKeyAuth] FUNCTION CALLED', {
     tokenLength: token?.length || 0,
     tokenPrefix: token ? token.substring(0, 10) + '...' : 'NO TOKEN',
+    tokenValue: token
+      ? token.length <= 20
+        ? token
+        : token.substring(0, 20) + '...'
+      : 'NO TOKEN',
   });
 
   // Basic key format validation - Unkey keys are typically alphanumeric
@@ -142,6 +172,14 @@ async function handleApiKeyAuth(
   if (trimmedToken.length < 10) {
     logger.error('Token too short to be valid', null, {
       tokenLength: trimmedToken.length,
+      tokenPreview:
+        trimmedToken.length <= 20
+          ? trimmedToken
+          : trimmedToken.substring(0, 20) + '...',
+      // Check if token might be malformed (contains "Bearer" or other issues)
+      containsBearer: trimmedToken.toLowerCase().includes('bearer'),
+      suggestion:
+        'API keys should be at least 10 characters. Please check your API key in plugin settings.',
     });
     return null;
   }
@@ -328,7 +366,10 @@ async function handleClerkAuth(logger: ReturnType<typeof createLogger>) {
     // Handle the case where auth() is called but clerkMiddleware isn't detected
     // This can happen for static files or routes that bypass middleware
     if (error instanceof Error && error.message.includes('clerkMiddleware')) {
-      logger.error('Clerk middleware not detected - route may be excluded from middleware', error);
+      logger.error(
+        'Clerk middleware not detected - route may be excluded from middleware',
+        error
+      );
       return null;
     }
     throw error;
