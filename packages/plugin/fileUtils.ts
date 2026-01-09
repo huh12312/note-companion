@@ -210,7 +210,7 @@ summary: "{{short summary of the video's main theme and key takeaways}}"
 
 - Extract topics by analyzing the main themes discussed in the transcript. Use 2-5 specific, relevant topics.
 
-- Generate tags based on the video content. Always include "youtube" and add 2-4 additional relevant tags. Tags in frontmatter should NOT include the "#" symbol (only use "#" for inline tags in the content body).
+- Generate tags based on the video content. Always include "youtube" and add 2-4 additional relevant tags. Tags in frontmatter should NOT include the "#" symbol (only use "#" for inline tags in the content body). **CRITICAL: Tags must have NO spaces between words. Use hyphens or underscores to connect multi-word tags (e.g., "web-development" or "machine_learning", not "web development" or "machine learning").**
 
 - Create a concise summary (1-2 sentences) that captures the video's main theme and key takeaways.
 
