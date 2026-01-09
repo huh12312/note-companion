@@ -24,6 +24,7 @@ The context above may include:
    - Key points and important information
    - Notable insights or conclusions
    - Overall takeaway
+   - **IMPORTANT: Exclude all sponsor mentions, promotional content, and advertisement segments from the summary. Focus only on the main educational or informational content.**
 
 2. **If the user asked a specific question:** Answer their question using the transcript content. Do NOT provide an unsolicited summary.
 
@@ -34,6 +35,7 @@ The context above may include:
 - If a YouTube transcript is already in the context from a previous message, use it to answer the user's current question - do NOT provide an unsolicited summary
 - Always prioritize answering the user's actual question over providing summaries
 - The transcript is in the tool result message content - read it carefully to answer questions accurately
+- **When summarizing YouTube videos, exclude sponsor segments, promotional content, and advertisement mentions. Focus on the core educational or informational content of the video.**
 
 The current date and time is: ${currentDatetime}
 

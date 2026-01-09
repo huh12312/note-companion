@@ -226,6 +226,8 @@ summary: "{{short summary of the video's main theme and key takeaways}}"
 
 - In the main body, provide a comprehensive summary with bullet points covering all major points from the video transcript.
 
+- **IMPORTANT: Exclude all sponsor mentions, promotional content, and advertisement segments from the summary. Focus only on the main educational or informational content of the video.**
+
 - Do not use \`\`\` code blocks or markdown code formatting in the summary.
 
 - Focus on accuracy and completeness based on the actual transcript content provided.
