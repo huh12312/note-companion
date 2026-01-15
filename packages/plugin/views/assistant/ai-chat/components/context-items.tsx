@@ -1,8 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import { SelectedItem } from "../selected-item";
 import { ContextItemType, useContextItems } from "../use-context-items";
 import { usePlugin } from "../../provider";
-import { TFolder } from "obsidian";
+import { TFolder, Notice } from "obsidian";
+import { X, Trash2 } from "lucide-react";
+import { tw } from "../../../../lib/utils";
 
 export const ContextItems: React.FC = () => {
   const plugin = usePlugin();
@@ -15,12 +17,36 @@ export const ContextItems: React.FC = () => {
     folders,
     youtubeVideos,
     tags,
-
     searchResults,
     removeByReference,
     toggleCurrentFile,
     textSelections,
+    clearAll,
   } = useContextItems();
+
+  const [showClearConfirm, setShowClearConfirm] = useState(false);
+
+  // Check if there are any context items to show clear button
+  const hasContextItems =
+    (currentFile && includeCurrentFile) ||
+    Object.keys(files).length > 0 ||
+    Object.keys(folders).length > 0 ||
+    Object.keys(tags).length > 0 ||
+    Object.keys(youtubeVideos).length > 0 ||
+    Object.keys(searchResults).length > 0 ||
+    Object.keys(textSelections).length > 0;
+
+  const handleClearAll = () => {
+    if (showClearConfirm) {
+      clearAll();
+      setShowClearConfirm(false);
+      new Notice("Context cleared");
+    } else {
+      setShowClearConfirm(true);
+      // Auto-hide confirmation after 3 seconds
+      setTimeout(() => setShowClearConfirm(false), 3000);
+    }
+  };
 
   const prefixMap = {
     file: "📄",
@@ -100,6 +126,52 @@ export const ContextItems: React.FC = () => {
   return (
     <div className="flex-grow overflow-x-auto">
       <div className="flex flex-col space-y-2">
+        {/* Clear Context button - only show when there are context items */}
+        {hasContextItems && (
+          <div className="flex items-center justify-end mb-1 gap-2">
+            {showClearConfirm ? (
+              <div className="flex items-center gap-1.5 text-xs">
+                <span className="text-[--text-muted]">Clear context?</span>
+                <button
+                  onClick={handleClearAll}
+                  className={tw(
+                    "text-[--text-error] hover:text-[--text-error]",
+                    "flex items-center gap-1 px-2 py-1 rounded",
+                    "hover:bg-[--background-modifier-hover] transition-colors",
+                    "font-medium"
+                  )}
+                >
+                  <Trash2 className="w-3 h-3" />
+                  <span>Yes, clear</span>
+                </button>
+                <button
+                  onClick={() => setShowClearConfirm(false)}
+                  className={tw(
+                    "text-[--text-muted] hover:text-[--text-normal]",
+                    "px-2 py-1 rounded",
+                    "hover:bg-[--background-modifier-hover] transition-colors"
+                  )}
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={handleClearAll}
+                className={tw(
+                  "text-xs text-[--text-muted] hover:text-[--text-normal]",
+                  "flex items-center gap-1 px-2 py-1 rounded",
+                  "hover:bg-[--background-modifier-hover] transition-colors"
+                )}
+                title="Clear all context items (files, folders, tags, etc.)"
+              >
+                <X className="w-3 h-3" />
+                <span>Clear context</span>
+              </button>
+            )}
+          </div>
+        )}
+
         {/* Current file section */}
         {currentFile && includeCurrentFile && (
           <div className="flex space-x-2">
@@ -186,7 +258,7 @@ export const ContextItems: React.FC = () => {
               <SelectedItem
                 key={search.id}
                 item={`"${search.query}" (${search.results.length} results)`}
-                onClick={() => 
+                onClick={() =>
                   handleItemClick("search", search.id, search.query)
                 }
                 onRemove={() => removeByReference(search.reference)}
@@ -203,7 +275,7 @@ export const ContextItems: React.FC = () => {
               <SelectedItem
                 key={selection.id}
                 item={`${selection.content.slice(0, 30)}...`}
-                onClick={() => 
+                onClick={() =>
                   handleItemClick("text-selection", selection.id, selection.content)
                 }
                 onRemove={() => removeByReference(selection.reference)}
