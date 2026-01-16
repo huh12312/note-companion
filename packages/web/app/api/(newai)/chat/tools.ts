@@ -344,8 +344,9 @@ export const chatTools = {
             }, z.string().describe('The markdown content for the new file')),
             folder: z
               .string()
+              .optional()
               .describe(
-                'Folder path where file should be created (default: root)'
+                'Folder path where file should be created (default: root, leave empty for root)'
               ),
           })
         )
