@@ -56,6 +56,9 @@ import {
 } from "./fileUtils";
 
 import { checkLicenseKey } from "./apiUtils";
+import { generateObject } from "ai";
+import { ollama } from "ollama-ai-provider";
+import { z } from "zod";
 
 import {
   VALID_IMAGE_EXTENSIONS,
@@ -850,9 +853,57 @@ export default class FileOrganizer extends Plugin {
     content: string,
     classifications: string[]
   ): Promise<string> {
-    const serverUrl = this.getServerUrl();
     const cutoff = this.settings.contentCutoffChars;
     const trimmedContent = content.slice(0, cutoff);
+
+    // Check if local LLM should be used (same logic as chat component)
+    // Use local LLM if showLocalLLMInChat is enabled and model is not a cloud model
+    const isCloudModel = this.settings.selectedModel === "gpt-4o-mini";
+    const shouldUseLocalLLM =
+      this.settings.showLocalLLMInChat && !isCloudModel;
+
+    if (shouldUseLocalLLM) {
+      // Use local Ollama model directly
+      const modelName =
+        this.settings.selectedModel === "llama3.2"
+          ? "llama3.2"
+          : this.settings.customModelName || "llama3.2";
+
+      try {
+        const response = await generateObject({
+          model: ollama(modelName),
+          schema: z.object({
+            documentType: z.string().optional(),
+          }),
+          system:
+            "Only answer with the name of the document type if it matches one of the template types. Otherwise, answer with an empty string.",
+          prompt: `Given the text content:
+
+          "${trimmedContent}"
+
+          Please identify which of the following document types best matches the content:
+
+          Template Types:
+          ${classifications.join(", ")}
+
+          If the content clearly matches one of the provided template types, respond with the name of that document type. If the content does not clearly match any of the template types, respond with an empty string.`,
+        });
+
+        return response.object.documentType || "";
+      } catch (error) {
+        logger.error("Error classifying with local LLM:", error);
+        // Throw error instead of falling back to server
+        // This ensures local-only mode doesn't require external connection
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Failed to classify document with local LLM";
+        throw new Error(errorMessage);
+      }
+    }
+
+    // Use server-based approach (default or fallback)
+    const serverUrl = this.getServerUrl();
     const response = await fetch(`${serverUrl}/api/classify1`, {
       method: "POST",
       headers: {
@@ -1163,6 +1214,82 @@ export default class FileOrganizer extends Plugin {
     const cutoff = this.settings.contentCutoffChars;
     const trimmedContent = content.slice(0, cutoff);
 
+    // Check if local LLM should be used (same logic as chat component)
+    const isCloudModel = this.settings.selectedModel === "gpt-4o-mini";
+    const shouldUseLocalLLM =
+      this.settings.showLocalLLMInChat && !isCloudModel;
+
+    if (shouldUseLocalLLM) {
+      // Use local Ollama model directly
+      const modelName =
+        this.settings.selectedModel === "llama3.2"
+          ? "llama3.2"
+          : this.settings.customModelName || "llama3.2";
+
+      try {
+        const count = 3; // Default count
+        const response = await generateObject({
+          model: ollama(modelName),
+          schema: z.object({
+            suggestedTags: z.array(
+              z.object({
+                score: z.number().min(0).max(100),
+                isNew: z.boolean(),
+                tag: z.string(),
+                reason: z.string().min(1),
+              })
+            ),
+          }),
+          system: `You are a precise tag generator. Analyze content and suggest ${count} relevant tags.
+              ${existingTags.length ? `Consider existing tags: ${existingTags.join(", ")}` : "Create new tags if needed."}
+              ${this.settings.customTagInstructions ? `Follow these custom instructions: ${this.settings.customTagInstructions}` : ""}
+
+              Guidelines:
+              - Prefer existing tags when appropriate (score them higher)
+              - Create specific, meaningful new tags when needed
+              - Score based on relevance (0-100)
+              - REQUIRED: Each tag MUST include a "reason" field explaining why it's relevant
+              - The reason should be a brief sentence (1-2 sentences) explaining the tag's relevance
+              - Focus on key themes, topics, and document type
+
+              Response format: Each tag object must have: score (number), isNew (boolean), tag (string), and reason (string).`,
+          prompt: `File: "${filePath}"
+
+              Content: """
+              ${trimmedContent}
+              """`,
+        });
+
+        // Sort tags by score and format response
+        // Ensure all required fields are present (explicit mapping to avoid optional types)
+        const sortedTags: Array<{
+          score: number;
+          tag: string;
+          reason: string;
+          isNew: boolean;
+        }> = response.object.suggestedTags
+          .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+          .map((tag) => ({
+            score: tag.score ?? 0,
+            isNew: tag.isNew ?? false,
+            tag: tag.tag.startsWith("#") ? tag.tag : `#${tag.tag}`,
+            reason: tag.reason || "Relevant to content theme",
+          }));
+
+        return sortedTags;
+      } catch (error) {
+        logger.error("Error recommending tags with local LLM:", error);
+        // Throw error instead of falling back to server
+        // This ensures local-only mode doesn't require external connection
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Failed to recommend tags with local LLM";
+        throw new Error(errorMessage);
+      }
+    }
+
+    // Use server-based approach (default or fallback)
     const response = await fetch(`${this.getServerUrl()}/api/tags/v2`, {
       method: "POST",
       headers: {
@@ -1223,6 +1350,68 @@ export default class FileOrganizer extends Plugin {
     const trimmedContent = content.slice(0, cutoff);
 
     const folders = this.getAllUserFolders();
+
+    // Check if local LLM should be used (same logic as chat component)
+    const isCloudModel = this.settings.selectedModel === "gpt-4o-mini";
+    const shouldUseLocalLLM =
+      this.settings.showLocalLLMInChat && !isCloudModel;
+
+    if (shouldUseLocalLLM) {
+      // Use local Ollama model directly
+      const modelName =
+        this.settings.selectedModel === "llama3.2"
+          ? "llama3.2"
+          : this.settings.customModelName || "llama3.2";
+
+      try {
+        const count = 3; // Default count
+        const response = await generateObject({
+          model: ollama(modelName),
+          schema: z.object({
+            suggestedFolders: z
+              .array(
+                z.object({
+                  score: z.number().min(0).max(100),
+                  isNewFolder: z.boolean(),
+                  folder: z.string(),
+                  reason: z.string(),
+                })
+              )
+              .min(1)
+              .max(count),
+          }),
+          system: `Given the content and file name: "${fileName}", suggest exactly ${count} folders. You can use: ${folders.join(
+            ", "
+          )}. If none are relevant, suggest new folders. ${
+            customInstructions ? `Instructions: "${customInstructions}"` : ""
+          }`,
+          prompt: `Content: "${trimmedContent}"`,
+        });
+
+        // Ensure all required fields are present and match FolderSuggestion type
+        const sortedFolders = response.object.suggestedFolders
+          .sort((a, b) => b.score - a.score)
+          .map((folder) => ({
+            score: folder.score ?? 0,
+            isNewFolder: folder.isNewFolder ?? false,
+            folder: folder.folder ?? "",
+            reason: folder.reason ?? "",
+          }));
+
+        return sortedFolders;
+      } catch (error) {
+        logger.error("Error recommending folders with local LLM:", error);
+        // Throw error instead of falling back to server
+        // This ensures local-only mode doesn't require external connection
+        const errorMessage =
+          error instanceof Error
+            ? error.message
+            : "Failed to recommend folders with local LLM";
+        throw new Error(errorMessage);
+      }
+    }
+
+    // Use server-based approach (default or fallback)
     const response = await fetch(`${this.getServerUrl()}/api/folders/v2`, {
       method: "POST",
       headers: {
