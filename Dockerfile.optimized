@@ -10,8 +10,11 @@ WORKDIR /app
 # Copy workspace configuration files
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml .npmrc ./
 
-# Copy patch file explicitly (patchedDependencies; @ in filename needs explicit path)
-COPY ["patches/xcode@3.0.1.patch", "./patches/"]
+# Copy patches dir (patchedDependencies in package.json; xcode used by mobile only)
+COPY patches/ ./patches/
+
+# Verify patch file exists before pnpm (fails with clear error if COPY or build context is wrong)
+RUN test -f ./patches/xcode@3.0.1.patch || (echo "ERROR: ./patches/xcode@3.0.1.patch not found" && exit 1)
 
 # Copy all package.json files for workspace packages
 COPY packages/web/package.json ./packages/web/
@@ -38,7 +41,7 @@ COPY --from=deps /app/packages ./packages
 
 # Copy workspace configuration (include .npmrc and patches for pnpm install --prod lockfile verification)
 COPY pnpm-workspace.yaml package.json pnpm-lock.yaml .npmrc ./
-COPY ["patches/xcode@3.0.1.patch", "./patches/"]
+COPY patches/ ./patches/
 
 # Copy all source code
 COPY packages/web ./packages/web
