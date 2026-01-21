@@ -54,9 +54,9 @@ ENV NODE_OPTIONS="--max-old-space-size=4096"
 WORKDIR /app/packages/web
 RUN pnpm run build:self-host
 
-# Prune devDependencies to reduce image size
+# Prune devDependencies (--config.confirmModulesPurge=false avoids interactive "Proceed? (Y/n)" in CI)
 WORKDIR /app
-RUN pnpm install --prod --frozen-lockfile
+RUN pnpm install --prod --frozen-lockfile --config.confirmModulesPurge=false
 
 # Stage 3: Runner
 # Create the final production image

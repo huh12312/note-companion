@@ -118,7 +118,10 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=registry,ref=${{ env.DOCKERHUB_REPO }}:buildcache
+          # Try registry first (faster when populated); fallback to GHA if buildcache doesn't exist yet
+          cache-from: |
+            type=registry,ref=${{ env.DOCKERHUB_REPO }}:buildcache
+            type=gha
           cache-to: type=registry,ref=${{ env.DOCKERHUB_REPO }}:buildcache,mode=max
           build-args: |
             NODE_ENV=production
