@@ -19,6 +19,21 @@ const getUrls = () => {
   };
 };
 
+async function hasExistingActiveOrTrialingSubscription(userId: string): Promise<boolean> {
+  try {
+    // Stripe list does not filter by metadata; we list and filter client-side.
+    const [active, trialing] = await Promise.all([
+      stripe.subscriptions.list({ status: "active", limit: 100 }),
+      stripe.subscriptions.list({ status: "trialing", limit: 100 }),
+    ]);
+    const combined = [...(active.data ?? []), ...(trialing.data ?? [])];
+    return combined.some((s) => s.metadata?.userId === userId);
+  } catch (err) {
+    console.error("hasExistingActiveOrTrialingSubscription:", err);
+    throw new Error("Unable to verify subscription status. Please try again later.");
+  }
+}
+
 // Internal helper to create Stripe Session without redirecting
 export async function _createStripeCheckoutSession(userId: string, plan: keyof typeof PRODUCTS) {
   const { success, cancel } = getUrls();
@@ -48,6 +63,12 @@ export async function _createStripeCheckoutSession(userId: string, plan: keyof t
 
   if (!priceInfo) {
     throw new Error(`No price info found for plan: ${plan}`);
+  }
+
+  if (productConfig.metadata.type === "subscription") {
+    if (await hasExistingActiveOrTrialingSubscription(userId)) {
+      throw new Error("You already have an active or trial subscription. Visit your dashboard to manage it.");
+    }
   }
 
   const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = [

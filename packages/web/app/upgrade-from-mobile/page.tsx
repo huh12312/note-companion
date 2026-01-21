@@ -29,7 +29,10 @@ export default async function UpgradeFromMobilePage() {
     return null; // Necessary after redirect
   } catch (error) {
     console.error('Error creating Stripe session for mobile upgrade:', error);
-    // Redirect to pricing page with an error indicator?
+    if (error instanceof Error && error.message.includes('already have an active or trial')) {
+      redirect('/dashboard?already_subscribed=1');
+      return null;
+    }
     redirect('/dashboard/pricing?error=checkout_failed');
     return null; // Necessary after redirect
   }

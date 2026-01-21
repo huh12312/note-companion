@@ -9,27 +9,24 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Check, Sparkles, Info, ArrowRight } from "lucide-react";
+import { Check, Sparkles, ArrowRight } from "lucide-react";
 import { config } from "@/srm.config";
-import { twMerge } from "tailwind-merge";
 import { Switch } from "@/components/ui/switch";
 import { useState } from "react";
 import {
   createMonthlySubscriptionCheckout,
   createYearlySubscriptionCheckout,
 } from "@/app/dashboard/pricing/actions";
-import Link from "next/link";
-
 interface PricingCardsProps {
   onSubscriptionComplete?: (type: 'cloud') => void;
 }
 
 export function PricingCards({ onSubscriptionComplete }: PricingCardsProps) {
   const [isYearly, setIsYearly] = useState(false);
-
-
+  const [isLoading, setIsLoading] = useState(false);
 
   const handlePlanSelection = async (planKey: string) => {
+    setIsLoading(true);
     try {
       let redirectUrl;
 
@@ -50,15 +47,24 @@ export function PricingCards({ onSubscriptionComplete }: PricingCardsProps) {
       if (redirectUrl) {
         window.location.href = redirectUrl;
       }
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      if (err?.message?.includes('already have an active or trial')) {
+        window.location.href = '/dashboard?already_subscribed=1';
+        return;
+      }
       // Handle Server Action deployment mismatch errors
-      if (error?.message?.includes('Failed to find Server Action') ||
-          error?.message?.includes('workers')) {
+      if (
+        err?.message?.includes('Failed to find Server Action') ||
+        err?.message?.includes('workers')
+      ) {
         alert('The application was recently updated. Please refresh the page and try again.');
       } else {
         console.error('Error creating checkout:', error);
         alert('Failed to create checkout session. Please try again.');
       }
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -150,10 +156,17 @@ export function PricingCards({ onSubscriptionComplete }: PricingCardsProps) {
           <Button
             className="w-full py-6 text-base font-medium transition-all cursor-pointer bg-violet-600 hover:bg-violet-700 text-white border-none shadow-md hover:shadow-lg"
             variant="default"
+            disabled={isLoading}
             onClick={() => handlePlanSelection(isYearly ? "Yearly" : "Monthly")}
           >
-            Get Started
-            <ArrowRight className="ml-2 h-4 w-4" />
+            {isLoading ? (
+              "Redirecting…"
+            ) : (
+              <>
+                Get Started
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </>
+            )}
           </Button>
         </CardFooter>
       </Card>
