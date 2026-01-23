@@ -3,8 +3,8 @@ name: Docker Build and Push
 on:
   push:
     tags:
-      - '[0-9]+.[0-9]+.[0-9]+'      # Match: 3.4.2
-      - 'v[0-9]+.[0-9]+.[0-9]+'     # Match: v3.4.2
+      - '*.*.*'                      # Match semantic versions like 3.4.2 (glob: any three parts)
+      - 'v*.*.*'                     # Match semantic versions like v3.4.2 (glob: v prefix + three parts)
   workflow_dispatch:
     inputs:
       tag:
