@@ -305,6 +305,120 @@ describe('POST /api/(newai)/tags/v2', () => {
       expect(callArgs.system).toContain('Create new tags if needed');
     });
 
+    it('should truncate long content using head+tail', async () => {
+      const mockResponse = {
+        object: {
+          suggestedTags: [
+            { score: 80, isNew: true, tag: 'tag', reason: 'Reason' },
+          ],
+        },
+        usage: { totalTokens: 100 },
+      };
+      (generateObject as jest.Mock).mockResolvedValueOnce(mockResponse);
+
+      const maxChars = 20000;
+      const headChars = Math.floor(maxChars * 0.7);
+      const tailChars = maxChars - headChars;
+      const headSeed = 'H'.repeat(headChars);
+      const tailSeed = 'T'.repeat(tailChars);
+      const longContent = `${headSeed}MIDDLE${'M'.repeat(2000)}${tailSeed}`;
+      const truncatedChars = longContent.length - maxChars;
+
+      const request = new NextRequest('http://localhost:3000/api/tags/v2', {
+        method: 'POST',
+        body: JSON.stringify({
+          content: longContent,
+          fileName: 'file.md',
+        }),
+      });
+
+      await POST(request);
+
+      const callArgs = (generateObject as jest.Mock).mock.calls[0][0];
+      expect(callArgs.prompt).toContain(headSeed);
+      expect(callArgs.prompt).toContain(tailSeed);
+      expect(callArgs.prompt).toContain(`...[truncated ${truncatedChars} chars]...`);
+    });
+
+    it('should not truncate when content is under the limit', async () => {
+      const mockResponse = {
+        object: {
+          suggestedTags: [
+            { score: 80, isNew: true, tag: 'tag', reason: 'Reason' },
+          ],
+        },
+        usage: { totalTokens: 100 },
+      };
+      (generateObject as jest.Mock).mockResolvedValueOnce(mockResponse);
+
+      const content = 'Short content';
+      const request = new NextRequest('http://localhost:3000/api/tags/v2', {
+        method: 'POST',
+        body: JSON.stringify({
+          content,
+          fileName: 'file.md',
+        }),
+      });
+
+      await POST(request);
+
+      const callArgs = (generateObject as jest.Mock).mock.calls[0][0];
+      expect(callArgs.prompt).toContain(content);
+      expect(callArgs.prompt).not.toContain('...[truncated');
+    });
+
+    it('should not truncate when content is exactly at the limit', async () => {
+      const mockResponse = {
+        object: {
+          suggestedTags: [
+            { score: 80, isNew: true, tag: 'tag', reason: 'Reason' },
+          ],
+        },
+        usage: { totalTokens: 100 },
+      };
+      (generateObject as jest.Mock).mockResolvedValueOnce(mockResponse);
+
+      const content = 'C'.repeat(20000);
+      const request = new NextRequest('http://localhost:3000/api/tags/v2', {
+        method: 'POST',
+        body: JSON.stringify({
+          content,
+          fileName: 'file.md',
+        }),
+      });
+
+      await POST(request);
+
+      const callArgs = (generateObject as jest.Mock).mock.calls[0][0];
+      expect(callArgs.prompt).toContain(content);
+      expect(callArgs.prompt).not.toContain('...[truncated');
+    });
+
+    it('should handle non-string content by sending empty content', async () => {
+      const mockResponse = {
+        object: {
+          suggestedTags: [
+            { score: 80, isNew: true, tag: 'tag', reason: 'Reason' },
+          ],
+        },
+        usage: { totalTokens: 100 },
+      };
+      (generateObject as jest.Mock).mockResolvedValueOnce(mockResponse);
+
+      const request = new NextRequest('http://localhost:3000/api/tags/v2', {
+        method: 'POST',
+        body: JSON.stringify({
+          content: { value: 'not-a-string' },
+          fileName: 'file.md',
+        }),
+      });
+
+      await POST(request);
+
+      const callArgs = (generateObject as jest.Mock).mock.calls[0][0];
+      expect(callArgs.prompt).not.toContain('not-a-string');
+    });
+
     it('should handle custom count parameter', async () => {
       const mockResponse = {
         object: {

@@ -14,6 +14,20 @@ const tagsSchema = z.object({
   }))
 });
 
+const MAX_CONTENT_CHARS = 20000;
+const HEAD_CHARS = Math.floor(MAX_CONTENT_CHARS * 0.7);
+const TAIL_CHARS = MAX_CONTENT_CHARS - HEAD_CHARS;
+
+function truncateContent(content: string): string {
+  if (content.length <= MAX_CONTENT_CHARS) {
+    return content;
+  }
+  const head = content.slice(0, HEAD_CHARS);
+  const tail = content.slice(-TAIL_CHARS);
+  const truncatedChars = content.length - MAX_CONTENT_CHARS;
+  return `${head}\n\n...[truncated ${truncatedChars} chars]...\n\n${tail}`;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const { userId } = await handleAuthorizationV2(request);
@@ -24,6 +38,9 @@ export async function POST(request: NextRequest) {
       customInstructions = "",
       count = 3
     } = await request.json();
+
+    const safeContent =
+      typeof content === "string" ? truncateContent(content) : "";
 
     const response = await generateObject({
       model: getModel() as any,
@@ -44,7 +61,7 @@ export async function POST(request: NextRequest) {
       prompt: `File: "${fileName}"
 
               Content: """
-              ${content}
+              ${safeContent}
               """`,
     });
 
