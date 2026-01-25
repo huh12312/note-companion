@@ -1,6 +1,10 @@
+const path = require('path');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: "standalone",
+  // Required for pnpm monorepo: ensures files outside app directory are traced
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   eslint: {
     ignoreDuringBuilds: true,
   },

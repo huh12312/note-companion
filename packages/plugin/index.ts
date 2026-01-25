@@ -677,19 +677,13 @@ export default class FileOrganizer extends Plugin {
     return formattedContent;
   }
 
-  async transcribeAudio(
+  /**
+   * Direct upload method for audio transcription (used for files < 4MB or as fallback when R2 is not configured)
+   */
+  async transcribeAudioDirectUpload(
     audioBuffer: ArrayBuffer,
     fileExtension: string
   ): Promise<Response> {
-    const fileSizeInMB = audioBuffer.byteLength / (1024 * 1024);
-    const PRESIGNED_URL_THRESHOLD_MB = 4; // Use pre-signed URL for files > 4MB to avoid Vercel limits
-
-    // For larger files, use pre-signed URL upload to bypass Vercel body size limit
-    if (fileSizeInMB > PRESIGNED_URL_THRESHOLD_MB) {
-      return this.transcribeAudioViaPresignedUrl(audioBuffer, fileExtension);
-    }
-
-    // For smaller files, use direct form data upload
     const formData = new FormData();
     const blob = new Blob([audioBuffer], { type: `audio/${fileExtension}` });
     formData.append("audio", blob, `audio.${fileExtension}`);
@@ -709,6 +703,22 @@ export default class FileOrganizer extends Plugin {
     return response;
   }
 
+  async transcribeAudio(
+    audioBuffer: ArrayBuffer,
+    fileExtension: string
+  ): Promise<Response> {
+    const fileSizeInMB = audioBuffer.byteLength / (1024 * 1024);
+    const PRESIGNED_URL_THRESHOLD_MB = 4; // Use pre-signed URL for files > 4MB to avoid Vercel limits
+
+    // For larger files, use pre-signed URL upload to bypass Vercel body size limit
+    if (fileSizeInMB > PRESIGNED_URL_THRESHOLD_MB) {
+      return this.transcribeAudioViaPresignedUrl(audioBuffer, fileExtension);
+    }
+
+    // For smaller files, use direct form data upload
+    return this.transcribeAudioDirectUpload(audioBuffer, fileExtension);
+  }
+
   async transcribeAudioViaPresignedUrl(
     audioBuffer: ArrayBuffer,
     fileExtension: string
@@ -716,79 +726,109 @@ export default class FileOrganizer extends Plugin {
     const fileName = `audio-${Date.now()}.${fileExtension}`;
     const mimeType = `audio/${fileExtension}`;
 
-    // Step 1: Get presigned URL from backend (small JSON request, bypasses Vercel body size limit)
-    const presignedUrlResponse = await fetch(
-      `${this.getServerUrl()}/api/create-upload-url`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.settings.API_KEY}`,
-        },
-        body: JSON.stringify({
-          filename: fileName,
-          contentType: mimeType,
-        }),
-      }
-    );
-
-    if (!presignedUrlResponse.ok) {
-      const errorData = await presignedUrlResponse.json();
-      throw new Error(
-        `Failed to get presigned URL: ${
-          errorData.error || errorData.details || "Unknown error"
-        }`
+    try {
+      // Step 1: Get presigned URL from backend (small JSON request, bypasses Vercel body size limit)
+      const presignedUrlResponse = await fetch(
+        `${this.getServerUrl()}/api/create-upload-url`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.settings.API_KEY}`,
+          },
+          body: JSON.stringify({
+            filename: fileName,
+            contentType: mimeType,
+          }),
+        }
       );
-    }
 
-    const { uploadUrl, key, publicUrl } = await presignedUrlResponse.json();
+      if (!presignedUrlResponse.ok) {
+        const errorData = await presignedUrlResponse.json();
+        const errorMessage =
+          errorData.error || errorData.details || "Unknown error";
 
-    if (!uploadUrl || !key || !publicUrl) {
-      throw new Error("Invalid response from create-upload-url endpoint");
-    }
+        // Check if error is due to missing R2 configuration
+        if (
+          errorMessage.includes("Missing R2 configuration") ||
+          errorMessage.includes("R2 storage is not properly configured") ||
+          errorMessage.includes("R2_PUBLIC_URL")
+        ) {
+          // Fall back to direct upload for self-hosted instances without R2
+          console.log(
+            "R2 not configured, falling back to direct upload for self-hosted instance"
+          );
+          return this.transcribeAudioDirectUpload(audioBuffer, fileExtension);
+        }
 
-    // Step 2: Upload directly to R2 using presigned URL (bypasses Vercel completely)
-    // This avoids Vercel's 4.5MB body size limit
-    // CORS is configured on R2 bucket, so we can use fetch with ArrayBuffer directly
-    // This ensures binary data integrity without any string conversion
-    const uploadResponse = await fetch(uploadUrl, {
-      method: "PUT",
-      headers: {
-        "Content-Type": mimeType,
-        // DO NOT include Authorization header - presigned URL handles auth
-      },
-      body: audioBuffer, // Send ArrayBuffer directly - no conversion needed
-    });
-
-    if (!uploadResponse.ok) {
-      throw new Error(
-        `Failed to upload audio to R2: ${uploadResponse.status} ${uploadResponse.statusText}`
-      );
-    }
-
-    // Step 3: Trigger transcription with the uploaded file URL
-    const transcribeResponse = await fetch(
-      `${this.getServerUrl()}/api/transcribe`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${this.settings.API_KEY}`,
-        },
-        body: JSON.stringify({
-          fileUrl: publicUrl,
-          key: key,
-          extension: fileExtension,
-        }),
+        throw new Error(`Failed to get presigned URL: ${errorMessage}`);
       }
-    );
 
-    if (!transcribeResponse.ok) {
-      const errorData = await transcribeResponse.json();
-      throw new Error(`Transcription failed: ${errorData.error}`);
+      const { uploadUrl, key, publicUrl } = await presignedUrlResponse.json();
+
+      if (!uploadUrl || !key || !publicUrl) {
+        throw new Error("Invalid response from create-upload-url endpoint");
+      }
+
+      // Step 2: Upload directly to R2 using presigned URL (bypasses Vercel completely)
+      // This avoids Vercel's 4.5MB body size limit
+      // CORS is configured on R2 bucket, so we can use fetch with ArrayBuffer directly
+      // This ensures binary data integrity without any string conversion
+      const uploadResponse = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: {
+          "Content-Type": mimeType,
+          // DO NOT include Authorization header - presigned URL handles auth
+        },
+        body: audioBuffer, // Send ArrayBuffer directly - no conversion needed
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error(
+          `Failed to upload audio to R2: ${uploadResponse.status} ${uploadResponse.statusText}`
+        );
+      }
+
+      // Step 3: Trigger transcription with the uploaded file URL
+      const transcribeResponse = await fetch(
+        `${this.getServerUrl()}/api/transcribe`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${this.settings.API_KEY}`,
+          },
+          body: JSON.stringify({
+            fileUrl: publicUrl,
+            key: key,
+            extension: fileExtension,
+          }),
+        }
+      );
+
+      if (!transcribeResponse.ok) {
+        const errorData = await transcribeResponse.json();
+        throw new Error(`Transcription failed: ${errorData.error}`);
+      }
+
+      return transcribeResponse;
+    } catch (error) {
+      // If any error related to presigned URL or R2, try direct upload as fallback
+      const errorMessage =
+        error instanceof Error ? error.message : String(error);
+      if (
+        errorMessage.includes("presigned URL") ||
+        errorMessage.includes("R2") ||
+        errorMessage.includes("Failed to upload audio to R2")
+      ) {
+        console.log(
+          "R2 upload failed, falling back to direct upload for self-hosted instance"
+        );
+        return this.transcribeAudioDirectUpload(audioBuffer, fileExtension);
+      }
+      // Re-throw other errors (network, auth, etc.)
+      throw error;
     }
-
-    return transcribeResponse;
   }
 
   async generateTranscriptFromAudio(

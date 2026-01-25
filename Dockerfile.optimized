@@ -79,7 +79,7 @@ RUN addgroup --system --gid 1001 nodejs && \
 
 # Copy standalone server output (minimal node_modules subset included)
 # With output: "standalone", Next.js creates .next/standalone/ containing:
-#   - server.js (typically at root: /app/server.js after copy)
+#   - In pnpm workspaces (Next.js 15+): server.js is at packages/web/server.js
 #   - node_modules/ (minimal subset, traced dependencies only)
 #   - Other traced files
 # Note: public and .next/static are NOT included in standalone by default
@@ -97,6 +97,8 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1
 
-# Standalone server entrypoint (server.js is at /app/server.js after copying standalone)
-WORKDIR /app
+# Standalone server entrypoint
+# In Next.js 15+ with pnpm workspaces, server.js is at packages/web/server.js
+# Run from the server.js directory to ensure correct relative paths for static files
+WORKDIR /app/packages/web
 CMD ["node", "server.js"]
