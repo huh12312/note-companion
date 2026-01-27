@@ -14,17 +14,18 @@ This guide will help you set up your own instance of Note Companion, allowing yo
 - [Security Considerations](#security-considerations)
 
 ## Prerequisites
-
-- **Node.js** 18 or higher
-- **pnpm** package manager (install with `npm install -g pnpm`)
-- **Git** for cloning the repository
+- **Docker** setup or build/compile via: **Node.js** 18 or higher + **pnpm** package manager (install with `npm install -g pnpm`) + **Git** for cloning the repository
 - **AI API Key** from at least one provider (OpenAI recommended for best results)
 - **4GB RAM** minimum on your server/computer
 - **Port 3000** available for production (or configure a different port)
 
 ## Quick Setup
 
-The fastest way to get started with self-hosting:
+**Docker** 
+Use the available docker-compose.yml file
+
+
+**Build/Compile**
 
 ```bash
 # 1. Clone the repository
@@ -47,7 +48,7 @@ pnpm start
 
 Your server will be running at `http://localhost:3000` (or the port specified in the `PORT` environment variable)
 
-## Detailed Installation
+## Detailed Installation (Build/Compile)
 
 ### Step 1: Clone and Install
 

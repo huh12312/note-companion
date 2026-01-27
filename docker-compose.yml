@@ -1,18 +1,30 @@
 services:
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: jpfong/note-companion:latest
     ports:
       - "3000:3000"
     environment:
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - SOLO_API_KEY=${SOLO_API_KEY}
-      - MODEL_VISION=${MODEL_VISION}
-      - MODEL_TEXT=${MODEL_TEXT}
-      - MODEL_NAME=${MODEL_NAME}
-      - MODEL_CLASSIFY=${MODEL_CLASSIFY}
-      - MODEL_TAGGING=${MODEL_TAGGING}
-      - MODEL_FOLDERS=${MODEL_FOLDERS}
+      - ENABLE_USER_MANAGEMENT=false  # Disable for self-hosting without authentication
+      - OPENAI_API_KEY=sk-...your_key_here...  #OpenAI API KEY (required unless additional AI providers are used)
 
-      - OLLAMA_API_URL=${OLLAMA_API_URL}
+# Optional: Custom OpenAI compatible API endpoint (for local LLMs like Ollama)
+#      - OPENAI_API_BASE=http://localhost:11434/v1  # Use this for local Ollama instances
+
+# Optional: Additional AI providers 
+#      - ANTHROPIC_API_KEY=sk-ant-...your_key_here...
+#      - GOOGLE_GENERATIVE_AI_API_KEY=...your_key_here...
+#      - GROQ_API_KEY=gsk_...your_key_here...
+#      - MISTRAL_API_KEY=...your_key_here...
+#      - DEEPSEEK_API_KEY=...your_key_here...
+#      - GOOGLE_VISION_API_KEY=...your_key_here...
+
+# Optional: Model Name to specify for OpenAI or for non-OpenAI models
+#      - MODEL_PROVIDER=openai  # Options: openai, anthropic, google, groq, mistral, deepseek
+#      - MODEL_NAME=gpt-4o-mini  # Model name for the selected provider
+
+# Optional: Specific Model selections
+#      - MODEL_VISION=${MODEL_VISION}
+#      - MODEL_TEXT=${MODEL_TEXT}
+#      - MODEL_CLASSIFY=${MODEL_CLASSIFY}
+#      - MODEL_TAGGING=${MODEL_TAGGING}
+#      - MODEL_FOLDERS=${MODEL_FOLDERS}
